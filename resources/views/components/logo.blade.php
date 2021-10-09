@@ -1,0 +1,1 @@
+<img src="{{ asset('images/site/' . \App\Models\Setting::first()->value('logo')) }}" alt="logo" style="max-width:120px">
