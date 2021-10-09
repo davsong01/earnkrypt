@@ -19,4 +19,3 @@ return [
         'charge:created' => \App\Jobs\CoinbaseWebhooks\HandleCreatedCharge::class,
     ],
 ];
-

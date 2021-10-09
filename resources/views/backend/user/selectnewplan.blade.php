@@ -44,6 +44,8 @@
         @foreach($plans as $plan)
 		<div class="col-md-4 col-sm-4 single-service wow fadeIn animated" data-wow-offset="10" data-wow-duration="1.5s">
 			<div class="single-package">
+                <form action="{{ route('plan.gateway') }}" target="_blank" method="POST">
+                    @csrf
 				    <h3 style="text-align: center;" class="package-heading main-color" style="text-align: center;">
                         {{ $plan->title }}
                     </h3>
@@ -58,27 +60,15 @@
                         {!! $plan->description !!}
                         
                     </ul>
-                    <input type="hidden" name="plan" value="{{ $plan->id }}" required>
+                    <input type="hidden" name="plan_id" value="{{ $plan->id }}" required>
+                    <input type="hidden" name="type" value="1" required>
                     <div>
                         <div>
-                            <a style="width: 100%;" class="btn btn-sm btn-primary login-submit-cs button-submit btn-submit"
-                               target="_blank" href="{{ $plan->payment_link }}">
-                              Make Payment
-                            </a>
-                            <script src="https://commerce.coinbase.com/v1/checkout.js?version=201807?onload=myfunction()" >
-                            </script>
-                            <script>
-                                myfunction(){
-                                    alert('hello');
-                                }
-                            </script>
-                          </div>
-                      
-                        </a>
+                            <button style="width: 100%;" class="btn btn-sm btn-primary login-submit-cs button-submit btn-submit">Make Payment</button>
+                        </div>                       
                     </div>
-
-                    
-			</div>
+                </div>
+            </form>
 		</div>
         @endforeach
         @endif

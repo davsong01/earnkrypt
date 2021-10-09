@@ -7,6 +7,7 @@ use App\Jobs\UpdateUserWallet;
 use App\Models\publishing_plans;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
+use Shakurov\Coinbase\Facades\Coinbase;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\pagesController;
 use App\Http\Controllers\TasksController;
@@ -106,19 +107,9 @@ Route::get('oauth/{driver}/callback', [LoginController::class, 'handleProviderCa
 
 Route::get('/', [pagesController::class, 'index'])->name('index');
 
-// //Route to select plan//Route to renew plan
-// Route::get('', function(){
-//     $plans = publishing_plans::all();
-//     return view('backend.user.selectplans', compact('plans'));
-// })->name('')->middleware(['auth', 'verified']);
-Route::get('/selectplans', [pagesController::class, 'selectplans'])->name('select.plan')->middleware(['auth', 'verified']);
-// Route::get('/selectplans', function(){
-//     $plans = publishing_plans::all();
-//     if(auth()->user()->plans()->count() > 0){
-//         return redirect(route('renew.plan'));
-//     }
-//     return view('backend.user.selectplans', compact('plans'));
-// })->name('renew.plan')->middleware(['auth', 'verified']);
+//Route to select plan//Route to renew plan
+// Route::get('/selectplans', [pagesController::class, 'selectplans'])->name('select.plan')->middleware(['auth', 'verified']);
+Route::post('/paywithcrypto', [pagesController::class, 'redirectToGateway'])->name('plan.gateway')->middleware(['auth', 'verified']);
 
 Route::get('/userselectnewplan', function(){
     $plans = publishing_plans::where('id', '!=', auth()->user()->publishing_plans_id)->get();
@@ -131,8 +122,17 @@ Route::get('/renewplan', function(){
     return view('backend.user.renewplans', compact('plan'));
 })->name('renew.plan')->middleware(['auth', 'verified']);
 
+//Route to select plan
+Route::get('/selectplans', function(){
+    $plans = publishing_plans::where('id', '!=', auth()->user()->publishing_plans_id)->get();
+    return view('backend.user.selectplans', compact('plans'));
+})->name('select.plan')->middleware(['auth', 'verified']);
+
+//Route to check payment confirmation
+Route::get('payment/{id}', [pagesController::class, 'confirmPayment'])->name('confirm.payment')->middleware(['auth', 'verified']);
 
 Route::get('/test', [pagesController::class, 'test'])->name('payment.test');
+// Route::get('/cancelcharges', [pagesController::class, 'test'])->name('payment.test');
 
 Route::post('/payment', [pagesController::class, 'payment2'])->name('payment2');
 Route::get('/payment', [pagesController::class, 'payment'])->name('payment');

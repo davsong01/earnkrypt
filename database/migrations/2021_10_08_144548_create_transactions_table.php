@@ -17,8 +17,9 @@ class CreateTransactionsTable extends Migration
             $table->id();
             $table->string('user_id');
             $table->string('reference');
-            $table->string('amount');
+            $table->double('amount');
             $table->string('status');
+            $table->string('plan_id')->nullable();
             $table->string('type')->nullable();
             $table->text('payment_data');
 

@@ -8,7 +8,9 @@ use App\Models\Design;
 use App\Models\Setting;
 use App\Mail\generalEmail;
 use App\Models\Transaction;
+use App\Mail\paymentComplete;
 use Illuminate\Support\Facades\Mail;
+use Shakurov\Coinbase\Facades\Coinbase;
 use Illuminate\Foundation\Bus\DispatchesJobs;
 use Illuminate\Routing\Controller as BaseController;
 use Illuminate\Foundation\Validation\ValidatesRequests;
@@ -195,28 +197,132 @@ class Controller extends BaseController
         return;
     }
 
-    protected function getCharges(){
+    protected function createCharge($name, $amount, $user_id, $type, $plan_id = null){
+        $charge = Coinbase::createCharge([
+            'name' => $name,
+            'description' => $name,
+            'local_price' => [
+                'amount' => $amount,
+                'currency' => 'USD',
+            ],
+            'metadata' => [
+                'user_id' => $user_id,
+                'type' => $type , //1 - plans, 2 - adverts, 3 - designs
+                'plan_id' => $plan_id ?? auth()->user()->plans->id,
+            ],
+    
+            'pricing_type' => 'fixed_price',
+        ]);
+
+        return $charge;
+    }
+   
+    protected function getCharges($url){
         $curl = curl_init();
 
         curl_setopt_array($curl, array(
-        CURLOPT_URL => 'https://api.commerce.coinbase.com/charges',
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_ENCODING => '',
-        CURLOPT_MAXREDIRS => 10,
-        CURLOPT_TIMEOUT => 0,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-        CURLOPT_CUSTOMREQUEST => 'GET',
-        CURLOPT_HTTPHEADER => array(
-            'X-CC-Api-Key: 289d349d-831d-4d2a-99fa-012db1dadb03',
-            'Cookie: __cfduid=db701e704100840bad156cdfdc957b7ae1616524238; amplitude_device_id=f1103d1d-59eb-4137-b39a-336c6ca6005f; coinbase_device_id=f1103d1d-59eb-4137-b39a-336c6ca6005f'
-        ),
+            CURLOPT_URL => 'https://api.commerce.coinbase.com/charges',
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_ENCODING => '',
+            CURLOPT_MAXREDIRS => 100,
+            CURLOPT_TIMEOUT => 0,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+            CURLOPT_CUSTOMREQUEST => 'GET',
+            CURLOPT_HTTPHEADER => array(
+                'X-CC-Api-Key: 289d349d-831d-4d2a-99fa-012db1dadb03',
+                'Cookie: __cfduid=db701e704100840bad156cdfdc957b7ae1616524238; amplitude_device_id=f1103d1d-59eb-4137-b39a-336c6ca6005f; coinbase_device_id=f1103d1d-59eb-4137-b39a-336c6ca6005f'
+            ),
+           
         ));
 
         $response = curl_exec($curl);
 
         curl_close($curl);
-        
+
         return $response;
     }
+
+    protected function getTransactionDetails($id){
+        return Coinbase::getCharge($id);
+    }
+
+    protected function processTransaction($plan, $payment, $type){ //1 - plans, 2 - adverts, 3 - designs
+        if($type == 1){
+            // add plan value
+            if($payment['payments'][0]['value']['local']['amount'] > $plan->amount ) {
+                auth()->user()->wallet_balance = auth()->user()->wallet_balance + ($payment['payments'][0]['value']['local']['amount'] - $plan->amount);
+            }elseif($payment['payments'][0]['value']['local']['amount'] == $plan->amount){
+                auth()->user()->publishing_plans_id = $plan->id;
+                auth()->user()->plan_expiry = Carbon::parse($payment['confirmed_at'])->addMonth(1);
+                auth()->user()->save();
+    
+            }else{
+                //Silence is golden
+            }
+    
+            //Update rreferal plan
+            $this->updateReferral($plan); 
+           
+            Mail::to(auth()->user()->email)->send(new paymentComplete(auth()->user(), $payment['name'], $payment['payments'][0]['value']['local']['amount']));
+    
+            Mail::to(Setting::select('official_mail')->first()->value('official_mail'))->send(new paymentComplete(auth()->user(), $payment['name'], $payment['payments'][0]['value']['local']['amount']));
+        }
+
+        if($type == 2){
+            // add advert value
+        }
+
+        if($type == 3){
+            // add design value
+        }
+
+        // create transaction log
+        $this->UpdateTransactionLog($payment['id'], $payment['payments'][0]['status'], json_encode($payment)); 
+                    
+    }
+
+    protected function updateTransactionLog($ref, $status, $data){
+        $transaction = Transaction::where('reference', $ref)->first();
+    
+        $transaction->update([
+            'reference' => $ref,
+            'status' => $status,
+            'payment_data' => $data,
+        ]);
+
+        return;
+    }
+    // protected function getCharges(){
+    //     $curl = curl_init();
+
+    //     curl_setopt_array($curl, array(
+    //         CURLOPT_URL => 'https://api.commerce.coinbase.com/charges',
+    //         CURLOPT_RETURNTRANSFER => true,
+    //         CURLOPT_ENCODING => '',
+    //         CURLOPT_MAXREDIRS => 100,
+    //         CURLOPT_TIMEOUT => 0,
+    //         CURLOPT_FOLLOWLOCATION => true,
+    //         CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+    //         CURLOPT_CUSTOMREQUEST => 'GET',
+    //         CURLOPT_HTTPHEADER => array(
+    //             'X-CC-Api-Key: 289d349d-831d-4d2a-99fa-012db1dadb03',
+    //             'Cookie: __cfduid=db701e704100840bad156cdfdc957b7ae1616524238; amplitude_device_id=f1103d1d-59eb-4137-b39a-336c6ca6005f; coinbase_device_id=f1103d1d-59eb-4137-b39a-336c6ca6005f'
+    //         ),
+           
+    //     ));
+
+    //     $response = curl_exec($curl);
+
+    //     curl_close($curl);
+       
+    //     $data = json_decode($response, true);
+    //     $push = $data['data'];
+    //     dd($push);
+    //     while(!is_null($data['pagination']['nex_uri'])){
+
+    //     }
+    //     return $response;
+    // }
+
 }

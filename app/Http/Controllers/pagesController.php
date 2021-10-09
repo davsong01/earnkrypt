@@ -10,6 +10,7 @@ use App\Models\User;
 use App\Models\Medal;
 use App\Models\Setting;
 use App\Models\Withdrawal;
+use App\Models\Transaction;
 use Coinbase\Wallet\Client;
 use Illuminate\Http\Request;
 use App\Mail\paymentComplete;
@@ -25,7 +26,7 @@ use Coinbase\Wallet\Enum\CurrencyCode;
 use Coinbase\Wallet\Resource\Checkout;
 use Shakurov\Coinbase\Facades\Coinbase;
 use Illuminate\Support\Facades\Redirect;
-use Coinbase\Wallet\Resource\Transaction;
+// use Coinbase\Wallet\Resource\Transaction;
 use Coinbase\Wallet\Resource\PaymentMethod;
 
 class pagesController extends Controller
@@ -62,98 +63,111 @@ class pagesController extends Controller
         
     }
 
-    public function payment(Request $request){
-        
-//        dd($request->all());
-//         $configuration = Configuration::apiKey(env('COINBASE_API_KEY'), env('COINBASE_WEBHOOK_SECRET'));
-//         $client = Client::create($configuration);
-
-//         $order = new Order([
-//             'name' => 'Order #1234',
-//             'amount' => Money::btc(1)
-//         ]);
-        
-//         $client->createOrder($order);
-
-        
-//         dd('sd');
-        
-        
+    public function test(Request $request){
        
-        
-//         // or use the convenience method
-//         // $deposit = new Deposit([
-//         //     'paymentMethodId' => $paymentMethodId
-//         // ]);
-
        
-//         $ch = curl_init();
-//         curl_setopt($ch, CURLOPT_URL, "curl https://api.coinbase.com/v2/user -H 'Authorization: Bearer d57fb2a790e440aec463d4a03ffc02e7117c33800d67afe5624fb03edd148c32'");
-        
-        
-//         curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-//         // $prices = json_decode(curl_exec($ch), true);
-//         curl_close($ch);
+        $jsonresponse = Coinbase::getCharges();
+        // dd($jsonresponse);
 
+        $charge = Coinbase::createCharge([
+            'name' => 'Name',
+            'description' => 'Description',
+            'local_price' => [
+                'amount' => 100,
+                'currency' => 'USD',
+            ],
+            'metadata' => [
+                'user_id' => auth()->user()->id,
+                
+            ],
 
-//         // $ch = curl_init();
-//         // curl_setopt($ch, CURLOPT_URL, "https://api.coinbase.com/v2/notifications \
-//         // -H 'Authorization: Bearer cfce1be2-2f48-4383-9166-3265cdcacdc3'");
-//         // curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-//         // $prices = json_decode(curl_exec($ch), true);
-//         // curl_close($ch);
-
-
-// //         curl https://api.coinbase.com/v2/user /
-// //   -H 'Authorization: Bearer 6915ab99857fec1e6f2f6c078583756d0c09d7207750baea28dfbc3d4b0f2cb80'
-//         dd($prices);
-
-    }
-
-
-    public function paymentpost(Request $request){
-      
-    }
-    public function savePlan(Request $request){
-
-        $ch = curl_init();
-
-        curl_setopt($ch, CURLOPT_URL, "curl https://api.coinbase.com/v2/user -H 'Authorization: Bearer d57fb2a790e440aec463d4a03ffc02e7117c33800d67afe5624fb03edd148c32");
-        
-        
-        
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
-        // $prices = json_decode(curl_exec($ch), true);
-        curl_close($ch);
-        
-
-        $params = array(
-            'name'               => 'My Order',
-            'amount'             => new Money(100, 'USD'),
-            // 'metadata'           => array( 'order_id' => $custom_order_id )
-        );
-        
-        $configuration = Configuration::apiKey(env('COINBASE_API_KEY'), env('COINBASE_WEBHOOK_SECRET'));
-        $client = Client::create($configuration);
-
-        
-        $checkout = new Checkout($params);
-        
-        $client->createCheckout($checkout);
-        // dd($checkout);
-        $code = $checkout->getEmbedCode();
-        $order = $client->createNewCheckoutOrder($checkout);
-        dd($order);
-        $redirect_url = "https://www.coinbase.com/checkouts/$code";     
-       
-        auth()->user()->update([
-            'publishing_plans_id' => $request->plan,
-            'plan_expiry' => $plan_expiry,
+            'pricing_type' => 'fixed_price',
         ]);
 
-        return redirect(route('profile.billing'))->with('message', 'Subscription Successsful');
+        return redirect()->away($charge['data']['hosted_url']);
+
     }
 
+    public function redirectToGateway(Request $request){
+   
+        $plan = publishing_plans::whereId($request->plan_id)->first();
+
+        //delete all user transactions that have not been confirmed over the last 1 day
+        $transactionsToDelete = auth()->user()->transactions()->where('status', 'PENDING')->where('created_at', '<', Carbon::now()->subDay(7))->get();
+        Transaction::destroy($transactionsToDelete->pluck('id'));
+        
+        $transaction = auth()->user()->transactions()->where('status', 'PENDING')->where('type', $request->type)->first();
+        $charge = $this->createCharge($plan->title, $plan->amount, auth()->user()->id, $request->type, $request->plan_id);
+
+        //if type == 1, i.e. Plan... we dont want multiple payments for a single plan
+        if($request->type && $request->type == 1){
+            if(is_null($transaction)){
+                // Create new/
+                $transaction = $this->createTransactionLog(auth()->user()->id, $charge['data']['id'], $plan->amount, 'PENDING', $request->type, json_encode($charge['data']));
+
+            }else{
+                $transaction->reference = $charge['data']['id'];
+                $transaction->save();
+            }
+        }else{
+            // create charge for type design or advert
+            // $charge = $this->createCharge($plan->title, $plan->amount, auth()->user()->id, $request->type, $request->plan_id);
+            // $transaction = $this->createTransactionLog(auth()->user()->id, $charge['data']['id'], $plan->amount, 'PENDING', $request->type, json_encode($charge['data']));
+            // $transaction = $this->createTransactionLog(auth()->user()->id, $charge['data']['id'], $plan->amount, 'PENDING', $request->type, json_encode($charge['data']));
+        }
+                    
+        return redirect()->away($charge['data']['hosted_url']);
+    }
+
+    public function confirmPayment($id){
+         //Check payment status and deliver value accordingly
+        $transactionDetails = $this->getTransactionDetails($id)['data'];
+        
+        if(is_null($transactionDetails)){
+            return abort(404);
+        }
+        $status = $transactionDetails['payments'][0]['status'];
+        //Backward compatibility to payments
+        if(!isset($transactionDetails['metadata']['user_id'])){
+            $transactionDetails['metadata']['user_id'] = auth()->user()->id;
+        }
+        if(!isset($transactionDetails['metadata']['plan_id'])){
+            $transactionDetails['metadata']['plan_id'] = auth()->user()->plans->id ?? 1;
+        }
+
+        if(!isset($transactionDetails['metadata']['type'])){
+            $transactionDetails['metadata']['type'] = 1;
+        }
+
+        //if type is plan         
+        if($transactionDetails['metadata']['type'] == 1){
+            $plan = publishing_plans::whereId($transactionDetails['metadata']['plan_id'])->first();
+            if($transactionDetails['payments'][0]['status'] == 'CONFIRMED'){
+
+                $this->processTransaction($plan ?? null, $transactionDetails, $transactionDetails['metadata']['type']);
+                $type = $transactionDetails['metadata']['type'];
+
+                return view('backend.user.paymentConfirmation', compact('status', 'type'));
+            }else{
+                return view('backend.user.paymentConfirmation', compact('status'));
+            }
+        }
+        
+        //if type is designs
+        if($transactionDetails['metadata']['type'] == 2){
+            if($transactionDetails['payments'][0]['status'] == 'CONFIRMED'){
+
+                $this->processTransaction($plan ?? null, $transactionDetails, $transactionDetails['metadata']['type']);
+                $type = $transactionDetails['metadata']['type'];
+                return view('backend.user.paymentConfirmation', compact('status', 'type'));
+            }else{
+                // return view('backend.user.paymentConfirmation', compact('status'));
+            }
+        }
+
+        
+        
+    }
     public function promote(){
 
         if(auth()->user()->wallet_address == NULL || auth()->user()->eth_wallet_address == NULL || auth()->user()->ltc_wallet_address == NULL || auth()->user()->bnb_wallet_address == NULL || auth()->user()->phone == NULL){
@@ -161,107 +175,6 @@ class pagesController extends Controller
         }
         return view('backend.user.index');
     }
-
-
-    public function selectplans(){
-        $plans = publishing_plans::all();
-
-        $curl = curl_init();
-
-        curl_setopt_array($curl, array(
-        CURLOPT_URL => 'https://api.commerce.coinbase.com/charges',
-        CURLOPT_RETURNTRANSFER => true,
-        CURLOPT_ENCODING => '',
-        CURLOPT_MAXREDIRS => 10,
-        CURLOPT_TIMEOUT => 0,
-        CURLOPT_FOLLOWLOCATION => true,
-        CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-        CURLOPT_CUSTOMREQUEST => 'GET',
-        CURLOPT_HTTPHEADER => array(
-            'X-CC-Api-Key: 289d349d-831d-4d2a-99fa-012db1dadb03',
-            'Cookie: __cfduid=db701e704100840bad156cdfdc957b7ae1616524238; amplitude_device_id=f1103d1d-59eb-4137-b39a-336c6ca6005f; coinbase_device_id=f1103d1d-59eb-4137-b39a-336c6ca6005f'
-          ),
-        ));
-
-        $response = curl_exec($curl);
-
-        curl_close($curl);
-        $jsonresponse = json_decode($response);
-       
-        foreach ($jsonresponse->data as $data) {
-            if (strtolower($data->metadata->email) == strtolower(auth()->user()->email)) {
-                # echo 'you tried to pay<br>';
-                # check for payments
-                if (empty($data->payments)) {
-                    $title = 'Purchase plan';
-            
-                    return redirect(url('/selectplans'));
-                }else{
-                    # echo 'you paid<br>';
-                    foreach ($data->payments as $paymentdata) {
-                        # show status
-                        if ($paymentdata->status == 'PENDING') {
-                            $plans = publishing_plans::all();
-                            $paymentmessage = 'Your Payment for your publishing plan is pending. Continue to refresh this page to the current status of your payment. You would also be notified via email when your payment has been confirmed';
-                            $paymentstatus = $paymentdata->status;
-                            // echo 'transaction is '.$paymentdata->status;
-                            return view('backend.user.selectplans', compact('plans','paymentmessage','paymentstatus'));
-                        }elseif($paymentdata->status == 'CONFIRMED'){
-                            # code...
-                            # echo 'transaction is '.$paymentdata->status;
-                            # get the title of the payment
-                            if (publishing_plans::where('title','=',$data->name)) {
-                                # the publishing plan exists now check for the publishing plan amount and check with the amount paid
-                                $pubplan = publishing_plans::where('title','=',$data->name)->first();
-                                if ($pubplan->amount == $paymentdata->value->local->amount) {
-                                    # if the amount is the same update user publishing plan
-                                    $user = User::findOrFail(auth()->user()->id); 
-                                    $user->publishing_plans_id = $pubplan->id;
-                                    $user->plan_expiry = Carbon::now()->addMonth(1);
-                                    $user->save();
-                                    // echo 'transaction is perfect your publishing plan has been updated';
-        
-                                    //Update upline referral bonus here
-                                    $this->updateReferral($pubplan); 
-        
-                                    Mail::to($user->email)->send(new paymentComplete($user, $data->name, $paymentdata->value->local->amount));
-                                    Mail::to(Setting::select('official_mail')->first()->value('official_mail'))->send(new paymentComplete($user, $data->name, $paymentdata->value->local->amount));
-                                    
-                                    return redirect()->route('dashboard');
-                                }elseif ($pubplan->amount < $paymentdata->value->local->amount) {
-                                   
-                                    $overpaymentbalance = $paymentdata->value->local->amount - $pubplan->amount;
-                                    $user = User::findOrFail(auth()->user()->id);
-                                    # add the balance to the wallet and update the users publishing plan
-                                    $user->wallet_balance = $user->wallet_balance + $overpaymentbalance;
-                                    $user->publishing_plans_id = $pubplan->id;
-                                    $user->save();
-                                    
-                                    return redirect()->route('dashboard');
-        
-                                    # echo 'transaction is overpaid but publishing plan is updated';
-                                    Mail::to($user->email)->send(new paymentComplete($user, $data->name, $paymentdata->value->local->amount, $overpaymentbalance));
-                                }elseif ($pubplan->amount > $paymentdata->value->local->amount) {
-                                    
-                                    $paymentmessage = 'Your payment was recieved but you made an underpayment. Kindly contact the admin to get a new link to complete your balance';
-                                    return view('backend.user.selectplans', compact('plans','paymentmessage'));
-        
-                                    // echo 'transaction is underpayment. contact admin';
-        
-                                    return redirect()->route('dashboard');
-                                    
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        
-        return view('backend.user.selectplans', compact('plans'));
-    }
-
-   
 
     public function newPromotion($media){
         $user_done_tasks = [];
@@ -324,49 +237,6 @@ class pagesController extends Controller
 
     }
 
-    public function test(){
-        $charge = Coinbase::createCharge([
-            'name' => 'Name',
-            'description' => 'Description',
-            'local_price' => [
-                'amount' => 100,
-                'currency' => 'USD',
-            ],
-            'metadata' => [
-                'user_id' => auth()->user()->id,
-                'email' => auth()->user()->email,
-            ],
-            'pricing_type' => 'fixed_price',
-        ]);
+   
 
-        $charges = Coinbase::getCharges();
-        dd($charges);
-        return redirect()->away($charge['data']['hosted_url']);
-
-}
-
-public function c(){
-    $curl = curl_init();
-
-    curl_setopt_array($curl, array(
-    CURLOPT_URL => 'https://api.commerce.coinbase.com/charges',
-    CURLOPT_RETURNTRANSFER => true,
-    CURLOPT_ENCODING => '',
-    CURLOPT_MAXREDIRS => 10,
-    CURLOPT_TIMEOUT => 0,
-    CURLOPT_FOLLOWLOCATION => true,
-    CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-    CURLOPT_CUSTOMREQUEST => 'GET',
-    CURLOPT_HTTPHEADER => array(
-        'X-CC-Api-Key: 289d349d-831d-4d2a-99fa-012db1dadb03',
-        'Cookie: __cfduid=db701e704100840bad156cdfdc957b7ae1616524238; amplitude_device_id=f1103d1d-59eb-4137-b39a-336c6ca6005f; coinbase_device_id=f1103d1d-59eb-4137-b39a-336c6ca6005f'
-    ),
-    ));
-
-    $response = curl_exec($curl);
-
-    curl_close($curl);
-    
-    return $response;
-}
 }
