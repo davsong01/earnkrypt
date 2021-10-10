@@ -28,7 +28,6 @@
                                     <th>Design Number</th>
                                     <th>Amount Paid</th>
                                     <th>Description</th>
-                                    <th>Transaction Id</th>
                                     <th>Status</th>
                                     <th>Actions</th>
                                 </tr>
@@ -36,12 +35,11 @@
                             <tbody>
                                 @foreach($designs as $design)
                                     <tr>
-                                        
                                         <td>{{ $design->created_at->format('Y-m-d') }}</td>
                                         <td>{{ $design->design_number }}</td>
                                         <td>${{ $design->amount_paid }}</td>
                                         <td>{{ $design->description }}</td>
-                                        <td>{{ $design->transaction_id }}</td>
+                                        
                                         <td>
                                             @if($design->status == 0)
                                             Pending

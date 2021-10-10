@@ -9,6 +9,7 @@ use App\Models\Setting;
 use App\Mail\generalEmail;
 use App\Models\Transaction;
 use App\Mail\paymentComplete;
+use App\Models\publishing_plans;
 use Illuminate\Support\Facades\Mail;
 use Shakurov\Coinbase\Facades\Coinbase;
 use Illuminate\Foundation\Bus\DispatchesJobs;
@@ -20,28 +21,53 @@ class Controller extends BaseController
 {
     use AuthorizesRequests, DispatchesJobs, ValidatesRequests;
 
-    protected function createSlot($type, $amount, $payment_id = null, $payment_type = null, $payment = null ){
+    public function redirect($request){
+            // $plan = publishing_plans::whereId($request->plan_id)->first();
+
+            //delete all user transactions that have not been confirmed over the last 1 day
+            $transactionsToDelete = auth()->user()->transactions()->where('status', 'PENDING')->where('created_at', '<', Carbon::now()->subDay(7))->get();
+            Transaction::destroy($transactionsToDelete->pluck('id'));
+            
+            $transaction = auth()->user()->transactions()->where('status', 'PENDING')->where('type', $request->type)->first();
+            //if type == 1, i.e. Plan... we dont want multiple payments for a single plan
+            if($request->type && $request->type == 1){
+                $plan = publishing_plans::whereId($request->plan_id)->first();
+                $charge = $this->createCharge($plan->title, $plan->amount, auth()->user()->id, $request->type, $request->plan_id, 1);
+
+                if(is_null($transaction)){
+                    // Create new/
+                    $transaction = $this->createTransactionLog(auth()->user()->id, $charge['data']['id'], $plan->amount, 'PENDING', $request->type, json_encode($charge['data']));
+
+                }else{
+                    $transaction->reference = $charge['data']['id'];
+                    $transaction->save();
+                }
+            }
+            
+
+            return redirect()->away($charge['data']['hosted_url']);
+          
+    }
+
+    protected function createSlot($amount, $payment_id = null, $payment_type = null, $payment = null ){
         
         $design = Design::create([
-            'type' => $type,
             'user_id' => auth()->user()->id,
             'amount_paid' => $amount,
             'transaction_id' => $payment_id,
-            'payment_type' => $payment_type
+            'variation' => $payment_type,
         ]);
-        
+    
         if(!empty($payment)){
-            $transaction = Transaction::updateOrCreate([
-                'reference' => $payment_id,
-                'user_id' => auth()->user()->id,
-                'amount' => $amount,
+            $transaction = Transaction::whereReference($payment_id)->first();
+            
+            $transaction->update([
                 'status' => 'CONFIRMED',
-                'type' => 'Design Slot',
                 'payment_data' => json_encode($payment),
-            ]);
+            ]);  
         }
   
-        $design->update(['design_number' => 'EKRYPT-' . substr($type, 0, 1) . substr($type, -1) . '-' . date('Y') . '-' . $design->id]);
+        $design->update(['design_number' => 'EKRYPT-' . substr($payment_type, 0, 1) . substr($payment_type, -1) . '-' . date('Y') . '-' . $design->id]);
     }
 
     protected function checkLogoPaymentFromBalance($balance, $amount){
@@ -52,53 +78,22 @@ class Controller extends BaseController
         }
     }
 
-    protected function getPayment($type){
-        if($type == 'logo'){
-            
-            $amount = Setting::first()->value('logo_price');
-        }
-        if($type == 'flier'){
-            $amount = Setting::first()->value('flier_price');
-        }
-        if($type == 'graphics_video'){
-            $amount = Setting::first()->value('graphics_video_price');
-        }
-
-        return $amount;
-    }
-
-    protected function getPaymentLink($type){
-        if($type == 'logo'){
-            
-            $link = Setting::first()->value('logo_payment_link');
-        }
-        if($type == 'flier'){
-            $link = Setting::first()->value('flier_payment_link');
-        }
-        if($type == 'graphics_video'){
-            $link = Setting::first()->value('graphics_video_payment_link');
-        }
-
-        return $link;
-    }
 
     protected function createAdvertSlot($amount, $trans_id = null, $payment_type = null, $payment = null){
         $advert = Advert::create([
             'user_id' => auth()->user()->id,
-            'amount_paid' => Setting::first()->value('advert_price'),
+            'amount_paid' => $amount,
             'transaction_id' => $trans_id ?? null,
             'payment_type' => $payment_type ?? null,
         ]);
 
         if(!empty($payment)){
-            $transaction = Transaction::updateOrCreate([
-                'reference' => $trans_id,
-                'user_id' => auth()->user()->id,
-                'amount' => $amount,
+            $transaction = Transaction::whereReference($trans_id)->first();
+            
+            $transaction->update([
                 'status' => 'CONFIRMED',
-                'type' => 'Advert slot',
                 'payment_data' => json_encode($payment),
-            ]);
+            ]); 
         }
 
         $advert->update(['advert_number' => 'EKRYPT-' . date('Y') . '-' . $advert->id]);
@@ -137,7 +132,7 @@ class Controller extends BaseController
         Mail::to($design->user->email)->send(new generalEmail($data));                            
     }
 
-    protected function sendAdvertDesignEmail($type, $amount, $purpose, $balance = null, $expected = null){
+    protected function sendAdvertDesignEmail($payment_id, $type, $amount, $purpose, $balance = null, $expected = null){
         $data = [
             'type' => $type,
             'name' => auth()->user()->name,
@@ -145,6 +140,7 @@ class Controller extends BaseController
             'purpose' => $purpose,
             'balance' => $balance,
             'expected' => $expected,
+            'payment_id' => $payment_id,
         ];
 
         if(!is_null(auth()->user()->email)){
@@ -184,7 +180,8 @@ class Controller extends BaseController
         return auth()->user()->upline()->first();
     }
 
-    protected function createTransactionLog($user_id, $ref, $amount, $status, $type, $data){
+    protected function createTransactionLog($user_id, $ref, $amount, $status, $type, $data, $variation = null){
+        
         $transaction = Transaction::updateOrCreate([
             'reference' => $ref,
             'user_id' => $user_id,
@@ -192,12 +189,14 @@ class Controller extends BaseController
             'status' => $status,
             'type' => $type,
             'payment_data' => $data,
+            'variation' => $variation ?? null
         ]);
 
         return;
     }
 
-    protected function createCharge($name, $amount, $user_id, $type, $plan_id = null){
+    protected function createCharge($name, $amount, $user_id, $type, $plan_id = null, $quantity, $variation = null){
+        // dd($name, $amount, $user_id, $quantity);
         $charge = Coinbase::createCharge([
             'name' => $name,
             'description' => $name,
@@ -209,39 +208,40 @@ class Controller extends BaseController
                 'user_id' => $user_id,
                 'type' => $type , //1 - plans, 2 - adverts, 3 - designs
                 'plan_id' => $plan_id ?? auth()->user()->plans->id,
+                'quantity' => $quantity,
+                'variation' => $variation ?? null, //Used by designs
             ],
     
             'pricing_type' => 'fixed_price',
         ]);
-
         return $charge;
     }
    
-    protected function getCharges($url){
-        $curl = curl_init();
+    // protected function getCharges($url){
+    //     $curl = curl_init();
 
-        curl_setopt_array($curl, array(
-            CURLOPT_URL => 'https://api.commerce.coinbase.com/charges',
-            CURLOPT_RETURNTRANSFER => true,
-            CURLOPT_ENCODING => '',
-            CURLOPT_MAXREDIRS => 100,
-            CURLOPT_TIMEOUT => 0,
-            CURLOPT_FOLLOWLOCATION => true,
-            CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-            CURLOPT_CUSTOMREQUEST => 'GET',
-            CURLOPT_HTTPHEADER => array(
-                'X-CC-Api-Key: 289d349d-831d-4d2a-99fa-012db1dadb03',
-                'Cookie: __cfduid=db701e704100840bad156cdfdc957b7ae1616524238; amplitude_device_id=f1103d1d-59eb-4137-b39a-336c6ca6005f; coinbase_device_id=f1103d1d-59eb-4137-b39a-336c6ca6005f'
-            ),
+    //     curl_setopt_array($curl, array(
+    //         CURLOPT_URL => 'https://api.commerce.coinbase.com/charges',
+    //         CURLOPT_RETURNTRANSFER => true,
+    //         CURLOPT_ENCODING => '',
+    //         CURLOPT_MAXREDIRS => 100,
+    //         CURLOPT_TIMEOUT => 0,
+    //         CURLOPT_FOLLOWLOCATION => true,
+    //         CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
+    //         CURLOPT_CUSTOMREQUEST => 'GET',
+    //         CURLOPT_HTTPHEADER => array(
+    //             'X-CC-Api-Key: 289d349d-831d-4d2a-99fa-012db1dadb03',
+    //             'Cookie: __cfduid=db701e704100840bad156cdfdc957b7ae1616524238; amplitude_device_id=f1103d1d-59eb-4137-b39a-336c6ca6005f; coinbase_device_id=f1103d1d-59eb-4137-b39a-336c6ca6005f'
+    //         ),
            
-        ));
+    //     ));
 
-        $response = curl_exec($curl);
+    //     $response = curl_exec($curl);
 
-        curl_close($curl);
+    //     curl_close($curl);
 
-        return $response;
-    }
+    //     return $response;
+    // }
 
     protected function getTransactionDetails($id){
         return Coinbase::getCharge($id);

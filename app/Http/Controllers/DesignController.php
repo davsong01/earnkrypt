@@ -5,7 +5,9 @@ namespace App\Http\Controllers;
 use App\Models\Design;
 use App\Models\Setting;
 use App\Mail\generalEmail;
+use App\Models\Transaction;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
 
 class DesignController extends Controller
@@ -21,53 +23,39 @@ class DesignController extends Controller
      */
     public function index()
     {
+        set_time_limit(240);
+        
         if(auth()->user()->user_types != 1 ){
             $designs = Design::orderBy('created_at', 'desc')->get();
             return view('backend.admin.designs.index', compact('designs'));
         }
 
         if(auth()->user()->user_types == 1 ){
-            
-            $jsonresponse = json_decode($this->getCharges(), true);
-            
-            //Get all advert payments made by this user via coinbase
-            $userPayments = Design::select('user_id', 'transaction_id')->whereUserId(auth()->user()->id)->whereNotNull('transaction_id')->wherePaymentType('Coinbase')->get()->toArray();
-            
-            $userPaymentsArray = array_merge_recursive(array_column($userPayments, 'transaction_id'));
-            $designNamesArray = ['EarnKrypt: Graphics Video', 'EarnKrypt: Order for Logo', 'EarnKrypt: Order for Flier'];
+            $allPayments = collect(auth()->user()->transactions->where('type', 2)->where('status', 'PENDING'));
            
-            $settings = Setting::first();
-            //Create an array of pyaments that are confirmed but are not yet created 
-            $allPayments = collect($jsonresponse['data'])->whereNotIn('id',  $userPaymentsArray)->where('payments', '!=', null)->whereIn('name', $designNamesArray); 
+            if($allPayments){
+                
+                 //loop through all payments and deliver value
+                foreach($allPayments as $payment){
+                    // print_r($payment);
                    
-            foreach($allPayments as $payment){
-                if(isset($payment['payments'][0]) && $payment['payments'][0]['status'] == 'CONFIRMED'){
-                    // If amount is exact
-                        $amount_paid = $payment['payments'][0]['value']['local']['amount'];
-                        $payment_id = $payment['id'];
-                        $price = 0;
-                        $percentage_bonus = !is_null($settings->value('design_referral_percent')) ? ((double) $settings->value('design_referral_percent')/100) * $amount_paid : 0;
+                        $transactionDetails = collect($this->getTransactionDetails($payment->reference)['data']);
+              
+                        if(isset($transactionDetails['payments'][0]) && $transactionDetails['payments'][0]['status'] == 'CONFIRMED'){
+                          
+                            $name = $transactionDetails['metadata']['variation'] ?? $payment->variation .  ' design';
+                            $variation = $transactionDetails['metadata']['variation'] ?? $payment->variation;
+                            
+                            $percentage_bonus = !is_null(Setting::first()->value('design_referral_percent')) ? ((double) Setting::first()->value('design_referral_percent')/100) * $transactionDetails['payments'][0]['value']['local']['amount'] : 0;
 
-                    if($payment['name'] == 'EarnKrypt: Order for Logo'){
-                        $price = (double) $settings->value('logo_price');
-                        $type = 'Logo';
-                    }
-
-                    if($payment['name'] == 'EarnKrypt: Order for Flier'){
-                        $price = (double) $settings->value('flier_price');
-                        $type = 'Flier';
-                    }
-
-                    if($payment['name'] == 'EarnKrypt: Graphics Video'){
-                        $price = (double) $settings->value('graphics_video_price');
-                        $type = 'Graphics Video';
-                    }
+                            $this->processDesignPayments($name, $payment->amount, $transactionDetails['payments'][0]['value']['local']['amount'], $variation, $payment->reference, $percentage_bonus, $transactionDetails);
+                                                       
+                        }
                     
-                    $this->processDesignPayments($payment['name'], $price, $amount_paid, $type, $payment['id'], $percentage_bonus, $payment);
-                   
                 }
+                   
             }
-                        
+               
             $designs = Design::whereUserId(auth()->user()->id)->latest()->get();
 
             return view('backend.user.designs', compact('designs'));
@@ -76,12 +64,11 @@ class DesignController extends Controller
     }
 
     public function processDesignPayments($purpose, $price, $amount_paid, $type, $payment_id, $percentage_bonus, $payment){
-  
+ 
         if(!is_null($price) && ($amount_paid == $price)){
-            
-            $this->createSlot($type, $amount_paid, $payment_id, 'Coinbase', $payment);
+            $this->createSlot($amount_paid, $payment_id, $type, $payment);
             $this->updateUplineOnAdvertDesignPayment($percentage_bonus);
-            $this->sendAdvertDesignEmail('advert_payment_received', $amount_paid, $purpose);
+            $this->sendAdvertDesignEmail($payment_id, 'advert_payment_received', $amount_paid, $purpose);
         }
 
         // If amount paid is over
@@ -91,16 +78,15 @@ class DesignController extends Controller
                 'wallet_balance' => $balance,
             ]);
 
-            // $this->createSlot($payment_id, 'Coinbase');
             $this->createSlot($type, $amount_paid, $payment_id, 'Coinbase', $payment);
             $this->updateUplineOnAdvertDesignPayment($amount_paid, $percentage_bonus);
-            $this->sendAdvertDesignEmail('over_payment_received_for_advert', $amount_paid, $purpose, $balance);
+            $this->sendAdvertDesignEmail($payment_id, 'over_payment_received_for_advert', $amount_paid, $purpose, $balance);
         }
         
         // If underpayment
-        if(!is_null($price) && ($amount_paid > $price)){
+        if(!is_null($price) && ($amount_paid < $price)){
             $balance = $price - $amount_paid;
-            $this->sendAdvertDesignEmail('under_payment_received_for_advert', $amount_paid, $purpose, $balance, $price);
+            $this->sendAdvertDesignEmail($payment_id, 'under_payment_received_for_advert', $amount_paid, $purpose, $balance, $price);
         }
     }
     /**
@@ -114,7 +100,8 @@ class DesignController extends Controller
     }
 
     public function processPayment(Request $request){
-        $type = $request->type;
+        // dd($request->all());
+        $type = $request->variation;
         $amount = Setting::first()->value($type.'_price');
         
         if($request->payment_method == 'wallet'){
@@ -127,7 +114,9 @@ class DesignController extends Controller
             auth()->user()->wallet_balance = auth()->user()->wallet_balance - $amount;
             auth()->user()->save();
            
-            $this->createSlot($type, $amount);
+            $this->createSlot($amount, null, $type);
+
+            return redirect(route('design.index'))->with('message', 'Operation Successful, You can choose the open slot in the table below, click edit to tell us more about your design');
         }
 
 
@@ -140,7 +129,10 @@ class DesignController extends Controller
             auth()->user()->referral_wallet_balance = auth()->user()->referral_wallet_balance - $amount;
             auth()->user()->save();
            
-            $this->createSlot($type, $amount);
+            $this->createSlot($amount, null, $type);
+           
+            return redirect(route('design.index'))->with('message', 'Operation Successful, You can choose the open slot in the table below, click edit to tell us more about your design');
+
         }
 
         if($request->payment_method == 'medal'){
@@ -152,21 +144,29 @@ class DesignController extends Controller
            auth()->user()->medals_wallet_balance = auth()->user()->medals_wallet_balance - $amount;
            auth()->user()->save();
           
-           $this->createSlot($type, $amount);
+           $this->createSlot($amount, null, $type);
+
+           return redirect(route('design.index'))->with('message', 'Operation Successful, You can choose the open slot in the table below, click edit to tell us more about your design');
 
        }
 
         if($request->payment_method == 'coinbase'){
-            //Create Coinbase payment
-            $amount = Setting::first()->value($type.'_price');
-            $back_route = 'design.index';
+             //delete all user transactions that have not been confirmed over the last 1 day
+             $transactionsToDelete = auth()->user()->transactions()->where('status', 'PENDING')->where('created_at', '<', Carbon::now()->subDay(7))->get();
+             Transaction::destroy($transactionsToDelete->pluck('id'));
 
-            $link = $this->getPaymentLink($request->type);
-            return view('backend.user.checkOut', compact('amount', 'link', 'back_route'));
-            $amount_to_pay = $this->getPayment($request->type);      
+            // dd($request->all());
+            $amount = Setting::first()->value($request->variation.'_price');
+
+            $charge = $this->createCharge($request->variation, $amount, auth()->user()->id, $request->type, null, 1, $request->variation);
+            
+            $transaction = $this->createTransactionLog(auth()->user()->id, $charge['data']['id'], $amount, 'PENDING', $request->type, json_encode($charge['data']), $request->variation);
+
+            return redirect()->away($charge['data']['hosted_url']);
+                      
         }
 
-        return redirect(route('design.index'))->with('message', 'Operation Successful, You can choose the open slot in the table below, click edit to tell us more about your design');
+      
        
     }
 

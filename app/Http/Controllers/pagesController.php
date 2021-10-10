@@ -89,34 +89,28 @@ class pagesController extends Controller
     }
 
     public function redirectToGateway(Request $request){
-   
-        $plan = publishing_plans::whereId($request->plan_id)->first();
+            //delete all user transactions that have not been confirmed over the last 1 day
+            $transactionsToDelete = auth()->user()->transactions()->where('status', 'PENDING')->where('created_at', '<', Carbon::now()->subDay(7))->get();
+            Transaction::destroy($transactionsToDelete->pluck('id'));
+            
+            $transaction = auth()->user()->transactions()->where('status', 'PENDING')->where('type', $request->type)->first();
+            //if type == 1, i.e. Plan... we dont want multiple payments for a single plan
+            if($request->type && $request->type == 1){
+                $plan = publishing_plans::whereId($request->plan_id)->first();
+                $charge = $this->createCharge($plan->title, $plan->amount, auth()->user()->id, $request->type, $request->plan_id, 1);
 
-        //delete all user transactions that have not been confirmed over the last 1 day
-        $transactionsToDelete = auth()->user()->transactions()->where('status', 'PENDING')->where('created_at', '<', Carbon::now()->subDay(7))->get();
-        Transaction::destroy($transactionsToDelete->pluck('id'));
-        
-        $transaction = auth()->user()->transactions()->where('status', 'PENDING')->where('type', $request->type)->first();
-        $charge = $this->createCharge($plan->title, $plan->amount, auth()->user()->id, $request->type, $request->plan_id);
+                if(is_null($transaction)){
+                    // Create new/
+                    $transaction = $this->createTransactionLog(auth()->user()->id, $charge['data']['id'], $plan->amount, 'PENDING', $request->type, json_encode($charge['data']));
 
-        //if type == 1, i.e. Plan... we dont want multiple payments for a single plan
-        if($request->type && $request->type == 1){
-            if(is_null($transaction)){
-                // Create new/
-                $transaction = $this->createTransactionLog(auth()->user()->id, $charge['data']['id'], $plan->amount, 'PENDING', $request->type, json_encode($charge['data']));
-
-            }else{
-                $transaction->reference = $charge['data']['id'];
-                $transaction->save();
+                }else{
+                    $transaction->reference = $charge['data']['id'];
+                    $transaction->save();
+                }
             }
-        }else{
-            // create charge for type design or advert
-            // $charge = $this->createCharge($plan->title, $plan->amount, auth()->user()->id, $request->type, $request->plan_id);
-            // $transaction = $this->createTransactionLog(auth()->user()->id, $charge['data']['id'], $plan->amount, 'PENDING', $request->type, json_encode($charge['data']));
-            // $transaction = $this->createTransactionLog(auth()->user()->id, $charge['data']['id'], $plan->amount, 'PENDING', $request->type, json_encode($charge['data']));
-        }
-                    
-        return redirect()->away($charge['data']['hosted_url']);
+
+            return redirect()->away($charge['data']['hosted_url']);
+
     }
 
     public function confirmPayment($id){

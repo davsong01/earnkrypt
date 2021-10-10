@@ -1,5 +1,4 @@
 @extends('backend.layouts.admin')
-@section('title', 'Purchase Plan')
 @section('content')
 <div class="container-fluid" style="margin: auto;">
     <div class="card">

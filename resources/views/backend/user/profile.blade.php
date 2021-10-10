@@ -31,7 +31,7 @@
                                 <div class="col-md-1 col-sm-1">
                                     <img src="{{'/uploads/' .$user->avatar }}" id="avatar" width="40px" style=" display: block; margin-left: auto;
                                     margin-right: auto; width: 50%;border-radius: 50%; width:50px;height:50px;margin-right:15px; float: left;" alt="Profile Picture">
-                                </div>
+                                </div> <br>
                                 <div class="col-md-10 col-sm-10">
                                     
                                    <strong> {{ $user->name }}</strong> <br>
@@ -40,6 +40,9 @@
                                 </p>
                             </div>
                         </div>
+                    </div>
+                    <div class="row">
+                        <div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
                             <div class="basic-login-inner">
                                 <div class="form-group-inner">
                                     <label class="wallet">Main Wallet</label>

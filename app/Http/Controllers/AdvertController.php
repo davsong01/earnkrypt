@@ -6,7 +6,9 @@ use App\Models\Task;
 use App\Models\Advert;
 use App\Models\Setting;
 use App\Mail\generalEmail;
+use App\Models\Transaction;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Mail;
 
 class AdvertController extends Controller
@@ -28,67 +30,66 @@ class AdvertController extends Controller
             return view('backend.admin.adverts.index', compact('adverts'));
         }
 
-        
         if(auth()->user()->user_types == 1 ){
-                
-            $jsonresponse = json_decode($this->getCharges(), true);
-            //Get all advert payments made by this user via coinbase
-            $userPayments = Advert::select('user_id', 'transaction_id')->whereUserId(auth()->user()->id)->whereNotNull('transaction_id')->wherePaymentType('Coinbase')->get()->toArray();
+            $allPayments = collect(auth()->user()->transactions->where('type', 3)->where('status', 'PENDING'));
            
-            $userPaymentsArray = array_merge_recursive(array_column($userPayments, 'transaction_id'));
-            
-            $advertNamesArray = ['EarnKrypt Advert Placement'];
+            if($allPayments){
+                
+                 //loop through all payments and deliver value
+                foreach($allPayments as $payment){
+                    // print_r($payment);
+                   
+                        $transactionDetails = collect($this->getTransactionDetails($payment->reference)['data']);
+              
+                        if(isset($transactionDetails['payments'][0]) && $transactionDetails['payments'][0]['status'] == 'CONFIRMED'){
+                          
+                            $name = $transactionDetails['name'];
 
-            //Create an array of pyaments that are confirmed but are not yet created 
-            $allPayments = collect($jsonresponse['data'])->whereNotIn('id',  $userPaymentsArray)->whereIn('name', $advertNamesArray)->where('payments', '!=', null); 
-
-            $settings = Setting::first();
-
-            foreach($allPayments as $payment){
-                if(isset($payment['metadata']) && strtolower($payment['metadata']['email']) == strtolower(auth()->user()->email) && isset($payment['payments'][0]) && $payment['payments'][0]['status'] == 'CONFIRMED' ){
-                    // If amount is exact
-                    $payment_id = $payment['id'];
-                    $amount_paid = $payment['payments'][0]['value']['local']['amount'];
-                    $percent_bonus = ($settings->advert_referral_percent/100) * $amount_paid;
-                    if(!is_null($settings->advert_price) && ( $amount_paid == $settings->advert_price)){
+                            $percentage_bonus = !is_null(Setting::first()->value('advert_referral_percent')) ? ((double) Setting::first()->value('advert_referral_percent')/100) * $transactionDetails['payments'][0]['value']['local']['amount'] : 0;
+      
+                            $this->processAdvertPayments($name, $payment->amount, $transactionDetails['payments'][0]['value']['local']['amount'], 2, $payment->reference, $percentage_bonus, $transactionDetails);
+                                                       
+                        }
                     
-                        $this->createAdvertSlot($amount_paid, $payment_id, 'Coinbase', $payment);
-                        $this->updateUplineOnAdvertDesignPayment($percent_bonus);
-                        $this->sendAdvertDesignEmail('advert_payment_received', $amount_paid, 'Advert');
-                    }
-
-                    // If amount paid is over
-                    if(!is_null($settings->advert_price) && ($amount_paid > $settings->advert_price)){
-                       
-                        $balance = $amount_paid - $settings->advert_price;
-                        auth()->user()->update([
-                            'wallet_balance' => $balance,
-                        ]);
-
-                        $this->createAdvertSlot($payment_id, $amount_paid, 'Coinbase', $payment);
-                        $this->updateUplineOnAdvertDesignPayment($amount_paid, $percent_bonus);
-                        $this->sendAdvertDesignEmail('over_payment_received_for_advert', $amount_paid, 'Advert', $balance);
-                        
-                    }
-
-                    // If underpayment
-                    if(!is_null($settings->advert_price) && ($amount_paid > $settings->advert_price)){
-                        $balance = $settings->advert_price - $amount_paid;
-
-                        $this->sendAdvertDesignEmail('under_payment_received_for_advert', $amount_paid, 'Advert', $balance, $settings->advert_price);
-
-                    }
                 }
+                   
             }
-                      
+               
             $adverts = Advert::whereUserId(auth()->user()->id)->latest()->get();
+
+            return view('backend.user.adverts', compact('adverts'));
         }
- 
+        
         return view('backend.user.adverts', compact('adverts'));
-    
     
     }
 
+    public function processAdvertPayments($purpose, $price, $amount_paid, $type, $payment_id, $percentage_bonus, $payment){
+ 
+        if(!is_null($price) && ($amount_paid == $price)){
+            $this->createAdvertSlot($amount_paid, $payment_id, 'Coinbase', $payment);
+            $this->updateUplineOnAdvertDesignPayment($percentage_bonus);
+            $this->sendAdvertDesignEmail($payment_id, 'advert_payment_received', $amount_paid, $purpose, $payment_id);
+        }
+
+        // If amount paid is over
+        if(!is_null($price) && ($amount_paid > $price)){
+            $balance = $amount_paid - $price;
+            auth()->user()->update([
+                'wallet_balance' => $balance,
+            ]);
+            
+            $this->createAdvertSlot($amount_paid, $payment_id, 'Coinbase', $payment);
+            $this->updateUplineOnAdvertDesignPayment($percentage_bonus);
+            $this->sendAdvertDesignEmail($payment_id, 'over_payment_received_for_advert', $amount_paid, $purpose, $balance, $payment_id);
+        }
+        
+        // If underpayment
+        if(!is_null($price) && ($amount_paid < $price)){
+            $balance = $price - $amount_paid;
+            $this->sendAdvertDesignEmail($payment_id, 'under_payment_received_for_advert', $amount_paid, $purpose, $balance, $price, $payment_id);
+        }
+    }
     /**
      * Show the form for creating a new resource.
      *
@@ -129,17 +130,20 @@ class AdvertController extends Controller
         }
 
         if($request->has('payment_method') && $request->payment_method == 'coinbase'){
+            //delete all user transactions that have not been confirmed over the last 1 day
+            $transactionsToDelete = auth()->user()->transactions()->where('status', 'PENDING')->where('created_at', '<', Carbon::now()->subDay(7))->get();
+            Transaction::destroy($transactionsToDelete->pluck('id'));
 
             $setting = Setting::first();
-            $link = $setting->value('advert_payment_link');
             $amount = $setting->value('advert_price');
-            $back_route = 'advert.index';
+ 
+            $charge = $this->createCharge('Advert Payment', $amount, auth()->user()->id, $request->type, auth()->user()->plans->id, 1, null);
+            
+            $transaction = $this->createTransactionLog(auth()->user()->id, $charge['data']['id'], $amount, 'PENDING', $request->type, json_encode($charge['data']), null);
 
-            return view('backend.user.checkOut', compact('amount', 'link', 'back_route'));
-  
+            return redirect()->away($charge['data']['hosted_url']);
         }
         
-
         return redirect(route('advert.index'))->with('message', 'Operation Successful, You can choose the open slot in the table below, click edit to add your advert link');
        
     }

@@ -16,7 +16,7 @@ class CreateDesignsTable extends Migration
         Schema::create('designs', function (Blueprint $table) {
             $table->id();
             $table->string('design_number')->nullable();
-            $table->string('type')->nullable();
+            $table->string('variation')->nullable();
             $table->string('user_id');
             $table->string('payment_type')->nullable();
             $table->string('amount_paid')->nullable();

@@ -79,7 +79,7 @@ NOTE: <em>Feel free to contact us via {{ \App\Models\Setting::first()->value('de
 
 Dear {{ $data['name'] }},
 
-Your payment of ${{ $data['amount'] }} has been received as paymment for {{ $data['purpose'] }}.
+Your payment of ${{ $data['amount'] }} with transaction id: <strong>{{ $data['payment_id'] }}</strong> has been received as paymment for {{ $data['purpose'] }}.
 
 @component('mail::button', ['url' => config('app.url') .'advert'])
 Head to dashboard to make use of your created slot<br><br>
@@ -90,7 +90,7 @@ Head to dashboard to make use of your created slot<br><br>
 
 Dear {{ $data['name'] }},
 
-Your payment of ${{ $data['amount'] }} has been received as paymment for {{ $data['purpose'] }}.
+Your payment of ${{ $data['amount'] }} with transaction id: <strong>{{ $data['payment_id'] }}</strong> has been received as paymment for {{ $data['purpose'] }}.
 
 However, we noticed you made an overpayment of ${{ $data['balance'] }}, this has been added to your wallet for future use.
 @component('mail::button', ['url' => config('app.url') .'advert'])
@@ -103,7 +103,7 @@ Head to dashboard to make use of your created slot<br><br>
 
 Dear {{ $data['name'] }},
 
-Your payment of ${{ $data['amount'] }} has been received as paymment for {{ $data['purpose'] }}.
+Your payment of ${{ $data['amount'] }} with transaction id: <strong>{{ $data['payment_id'] }}</strong> has been received as paymment for {{ $data['purpose'] }}.
 
 However, you do no have a slot created yet because you made an underpayment.
 

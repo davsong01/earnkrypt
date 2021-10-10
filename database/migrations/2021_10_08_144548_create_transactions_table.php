@@ -21,6 +21,7 @@ class CreateTransactionsTable extends Migration
             $table->string('status');
             $table->string('plan_id')->nullable();
             $table->string('type')->nullable();
+            $table->string('variation')->nullable();
             $table->text('payment_data');
 
             $table->timestamps();

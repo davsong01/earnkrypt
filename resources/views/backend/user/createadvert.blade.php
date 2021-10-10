@@ -11,7 +11,7 @@
                     </div>
                     <div class="card-header">
                         <div>
-                            <p>Hi {{ auth()->user()->username }}, you are eligible to place advert links, however you need to make payment of <strong>${{ \App\Models\Setting::first()->value('advert_price') }}</strong> as advert fee per advert. After Payment you will be given an advert slot <strong><a href="{{ route('advert.index') }}">HERE</a></strong> which you can edit and add your advert link <br>
+                            <p>Hi {{ auth()->user()->username }}, you are eligible to place advert links, however you need to make payment of <strong>${{ \App\Models\Setting::first()->value('advert_price') }}</strong> as advert fee per advert. After Payment is confirmed you will be given an advert slot <strong><a href="{{ route('advert.index') }}">HERE</a></strong> which you can edit and add your advert link <br>
                                 You can choose to make payment from your wallets or with coinbase.                            
                             </p>
                            <br>
@@ -26,7 +26,7 @@
                             
                     </div>
                     <form action="{{ route('advert.pay') }}" method="POST"
-                        enctype="multipart/form-data" class="pb-2">
+                        enctype="multipart/form-data" class="pb-2" target="_blank">
                         @csrf
 
                         <div class="row">
@@ -47,6 +47,7 @@
                                         <option value="coinbase">Pay with coinbase</option>
                                     </select>
                                 </fieldset>
+                                <input type="hidden" value="3" name ="type">
                                <br>
                                 <div class="login-btn-inner">
                                     <div>

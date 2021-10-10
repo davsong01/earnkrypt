@@ -28,14 +28,14 @@
                             
                     </div>
                     <form action="{{ route('design.pay') }}" method="POST"
-                        enctype="multipart/form-data" class="pb-2">
+                        enctype="multipart/form-data" class="pb-2" target = "_blank">
                         @csrf
 
                         <div class="row">
                             <div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
                                 <fieldset class="form-group">
                                     <label for="type">Select design type</label>
-                                    <select class="form-control" name="type" id="type" required>
+                                    <select class="form-control" name="variation" id="variation" required>
                                         <option value="">Select Option</option>
                                         <option value="logo">Logo design (${{ \App\Models\Setting::first()->value('logo_price') }})</option>
                                         <option value="flier">Flier design (${{ \App\Models\Setting::first()->value('flier_price') }})</option>
@@ -59,7 +59,7 @@
                                     </select>
                                 </fieldset>
                             </div>
-                           
+                           <input type="hidden" value="2" name="type">
                             <div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
                                 <div class="login-btn-inner">
                                     <div>
