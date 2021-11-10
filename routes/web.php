@@ -4,6 +4,7 @@ use App\Models\User;
 use App\Models\Vendor;
 use Illuminate\Http\Request;
 use App\Jobs\UpdateUserWallet;
+use Illuminate\Support\Carbon;
 use App\Models\publishing_plans;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
@@ -111,22 +112,17 @@ Route::get('/', [pagesController::class, 'index'])->name('index');
 // Route::get('/selectplans', [pagesController::class, 'selectplans'])->name('select.plan')->middleware(['auth', 'verified']);
 Route::post('/paywithcrypto', [pagesController::class, 'redirectToGateway'])->name('plan.gateway')->middleware(['auth', 'verified']);
 
-Route::get('/userselectnewplan', function(){
-    $plans = publishing_plans::where('id', '!=', auth()->user()->publishing_plans_id)->get();
-    return view('backend.user.selectnewplan', compact('plans'));
-})->middleware(['auth', 'verified']);
+Route::get('/userselectnewplan',  [pagesController::class, 'selectnew'])->middleware(['auth', 'verified']);
+
+Route::resource('withdraw', '\App\Http\Controllers\WithdrawalController')->middleware(['auth', 'verified']);
+Route::get('withdraw/delete/{id}', [WithdrawalController::class, 'deleteWithdrawal'])->name('withdrawal.delete')->middleware(['auth', 'verified']);
+
 
 //Route to renew plan
-Route::get('/renewplan', function(){
-    $plan = auth()->user()->plans;
-    return view('backend.user.renewplans', compact('plan'));
-})->name('renew.plan')->middleware(['auth', 'verified']);
+Route::get('/renewplan',  [pagesController::class, 'renew'])->name('renew.plan')->middleware(['auth', 'verified']);
 
 //Route to select plan
-Route::get('/selectplans', function(){
-    $plans = publishing_plans::where('id', '!=', auth()->user()->publishing_plans_id)->get();
-    return view('backend.user.selectplans', compact('plans'));
-})->name('select.plan')->middleware(['auth', 'verified']);
+Route::get('/selectplans', [pagesController::class, 'select'])->name('select.plan')->middleware(['auth', 'verified']);
 
 //Route to check payment confirmation
 Route::get('payment/{id}', [pagesController::class, 'confirmPayment'])->name('confirm.payment')->middleware(['auth', 'verified']);
@@ -144,13 +140,9 @@ Route::middleware(['verified', 'auth', 'hasPlan', 'expiredPlan'])->group(functio
     Route::get('/promote', [pagesController::class, 'promote'])->name('promote.index');
     Route::post('/promote/save', [pagesController::class, 'savePromotion'])->name('promote.save');
     Route::get('/promote/save/{media}', [pagesController::class, 'newPromotion'])->name('promote.new');
-    Route::resource('tasks', '\App\Http\Controllers\TasksController');
-    Route::resource('withdraw', '\App\Http\Controllers\WithdrawalController');
-    Route::get('withdraw/delete/{id}', [WithdrawalController::class, 'deleteWithdrawal'])->name('withdrawal.delete');
-   
+    Route::resource('tasks', '\App\Http\Controllers\TasksController');   
     Route::get('/referral', [UserController::class, 'getReferral'])->name('referrals');
-    
-    
+ 
 });
 
 //Account Routes

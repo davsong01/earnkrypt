@@ -1,5 +1,6 @@
 @extends('backend.layouts.admin')
 @section('content')
+@section('title', 'Select Plan')
 <div class="container-fluid" style="margin: auto;">
     <div class="card">
         <div class="card-header">
@@ -60,7 +61,7 @@
                         
                     </ul>
                     <input type="hidden" name="plan_id" value="{{ $plan->id }}" required>
-                    <input type="hidden" name="type" value="1" required>
+                    <input type="hidden" name="type" value="2" required>
                     <div>
                         <div>
                             <button style="width: 100%;" class="btn btn-sm btn-primary login-submit-cs button-submit btn-submit">Make Payment</button>

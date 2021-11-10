@@ -20,8 +20,10 @@
                                     <th>Subscriber</th>
                                     <th>Reference</th>
                                     <th>Amount</th>
+                                    <th>Status</th>
                                     <th>Type</th>
                                     <th>Date</th>
+                                    <th>Action</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -31,8 +33,37 @@
                                         <td>{{ $transaction->user->username ?? 'N/A' }}</td>
                                         <td>{{ $transaction->reference}}</td>
                                         <td>{{ $transaction->amount}}</td>
-                                        <td>{{ $transaction->type}}</td>
-                                        <td>{{ date(json_decode($transaction->payment_data, true)['confirmed_at'])}}</td>
+                                        <td>{{ $transaction->status}} </td>
+                                        <td> <small>
+                                            @if($transaction->type == 1) New Plan @endif
+                                            @if($transaction->type == 2) Plan Renewal @endif
+                                            @if($transaction->type == 3) Advert @endif
+                                            @if($transaction->type == 4) Design @endif
+                                            
+                                            </small>
+                                        </td>
+                                        <td>{{ $transaction->status == 'PENDING' ? '' : date(json_decode($transaction->payment_data, true)['confirmed_at'])}}</td>
+                                        <td>
+                                            <div class="btn-group">
+                                                @if($transaction->status != 'CONFIRMED')
+                                                <a data-toggle="tooltip" data-placement="top" title="Edit medal"
+                                                    class="btn btn-info edit"
+                                                    href="{{ route('transaction.edit', $transaction->id) }}"><i
+                                                        class="fa fa-edit"></i>
+                                                </a>
+                                                @endif
+                                                <form
+                                                    action="{{ route('transaction.destroy', $transaction->id) }}"
+                                                    method="POST" onsubmit="return confirm('You are about to permanently delete this transaction');">
+                                                    @csrf
+                                                    @method('delete')
+                                                    <button type="submit" class="btn btn-danger edit"
+                                                        data-toggle="tooltip" data-placement="top" title="Delete transaction">
+                                                        <i class="fa fa-trash"></i>
+                                                    </button>
+                                                </form>
+                                            </div>
+                                        </td>
                                     </tr>
                                 @endforeach
 

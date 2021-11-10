@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 
 class AdminController extends Controller
@@ -70,6 +71,7 @@ class AdminController extends Controller
             'password' => $password,
             'user_types' => 2,
             'avatar' => isset($avatar) ? $avatar : NULL,
+            'email_verified_at' => Carbon::now(), 
          ]);
 
         return redirect(route('admins.index'))->with('message', 'Admin successfully added');

@@ -60,9 +60,12 @@ class TransactionController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function edit($id)
+    public function edit(Transaction $transaction)
     {
-        //
+        if($transaction->status == 'CONFIRMED'){
+            return back()->with('error', 'You cannot edit a transaction that is already confirmed');
+        }
+        return view('backend.admin.transactions.update', compact('transaction'));
     }
 
     /**
@@ -72,9 +75,11 @@ class TransactionController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function update(Request $request, $id)
+    public function update(Request $request, Transaction $transaction)
     {
-        //
+        $transaction->update($request->all());
+
+        return redirect(route('transaction.index'))->with('message', 'Update successful');
     }
 
     /**
@@ -83,8 +88,9 @@ class TransactionController extends Controller
      * @param  int  $id
      * @return \Illuminate\Http\Response
      */
-    public function destroy($id)
+    public function destroy(Transaction $transaction)
     {
-        //
+        $transaction->delete();
+        return back()->with('message', 'Delete successful');
     }
 }

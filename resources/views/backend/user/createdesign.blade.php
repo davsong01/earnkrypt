@@ -22,7 +22,7 @@
                         <div class="colored-line">
                         </div>
                             <p>
-                                Not to worry, Click the make payment button for your preffered, enter your email and come back and click <a href="{{ route('vendor.viewall') }}" target="_blank"><strong>HERE</strong></a> to ask one of our verified and trusted vendors to make payment for you. <br>
+                               Not to worry, select the Pay with coinbase option and click payment button below. <a href="{{ route('vendor.viewall') }}" target="_blank"><strong>Click HERE</strong></a> to ask one of our verified and trusted vendors to make payment for you. <br>
                             <strong>NOTE: </strong> Do not send payment details to vendor except you have concluded negotiations with vendor
                             </p>
                             
@@ -59,7 +59,7 @@
                                     </select>
                                 </fieldset>
                             </div>
-                           <input type="hidden" value="2" name="type">
+                           <input type="hidden" value="4" name="type">
                             <div class="col-lg-12 col-md-12 col-sm-12 col-xs-12">
                                 <div class="login-btn-inner">
                                     <div>

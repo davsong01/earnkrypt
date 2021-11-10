@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\User;
 use App\Models\Setting;
 use App\Models\Withdrawal;
 use Illuminate\Http\Request;
@@ -16,19 +17,20 @@ class WithdrawalController extends Controller
     {
         $count = 1;
         if(auth()->user()->user_types == 2 || auth()->user()->user_types == 3){
-            $withdrawals = Withdrawal::with('user')->get();
+            $withdrawals = Withdrawal::with('user')->orderBy('created_at', 'DESC')->get();
             
             return view('backend.admin.withdrawals.index', compact('withdrawals', 'count'));
         }
 
-        if(auth()->user()->user_types == 1 ){
+        // if(auth()->user()->user_types == 1 ){
+        //     return back()->with('error', 'Sorry, withdrawal is not possible at the moment, please check back later');
 
             $withdrawals = Withdrawal::with('user')->whereUserId(auth()->user()->id)->get();
 
             $minimum = Setting::select('payment_delay')->first()->value('payment_delay');
 
             return view('backend.user.withdrawals', compact('minimum', 'withdrawals', 'count'));
-        } 
+        // } 
     }
 
     public function create()
@@ -57,7 +59,6 @@ class WithdrawalController extends Controller
             }
             //End of check
                       
-
             $withdrawal_commision = ($commission / 100) * $request->amount;
             $amount = $request->amount - $withdrawal_commision;
 
@@ -71,6 +72,10 @@ class WithdrawalController extends Controller
                 return back()->with('error', 'Maximum amount you can withdraw from your referral earnings  is: $'.auth()->user()->referral_wallet_balance);
             }
 
+            if((Carbon::now()->format("l") != 'Friday' || Carbon::now()->format("l") != 'Saturday' ) && (auth()->user()->referral_wallet_balance < Setting::first()->value('withdrawal_threshold'))){
+                return back()->with('message', 'You cannot withdraw at this time');
+            }
+                                
             $withdrawal_commision = 0;
             auth()->user()->referral_wallet_balance =  auth()->user()->referral_wallet_balance - $request->amount;
             auth()->user()->save();
@@ -80,6 +85,10 @@ class WithdrawalController extends Controller
         if($request->wallet == 'medal'){
             if( auth()->user()->medals_wallet_balance < $request->amount){
                 return back()->with('error', 'Maximum amount you can withdraw from your medal earnings  is: $'.auth()->user()->medals_wallet_balance);
+            }
+
+            if(auth()->user()->medals_wallet_balance < Setting::first()->value('withdrawal_threshold')){
+                return back()->with('message', 'You cannot withdraw more than $' . Setting::first()->value('withdrawal_threshold'));
             }
 
             $withdrawal_commision = 0;
@@ -101,7 +110,6 @@ class WithdrawalController extends Controller
         Mail::to(Setting::select('official_mail')->first()->value('official_mail'))->send(new adminWithdrawal($user, $withdrawal));
 
         Mail::to(auth()->user()->email)->send(new investorWithdrawal($user, $withdrawal));
-
 
         $count = 1;
         return redirect(route('withdraw.index'))->with('message', 'Request sent successfully, you can check the status of your request here')->with('count', $count);
@@ -151,33 +159,32 @@ class WithdrawalController extends Controller
     public function deleteWithdrawal($id)
     {
 
-        $withdrawal = Withdrawal::findorfail($id);
-
+        $withdrawal = Withdrawal::with('user')->findorfail($id);
+        $user = User::find($withdrawal->user_id);
         if(auth()->user()->user_types == 2 || auth()->user()->user_types == 3){
-           
-            if($withdrawal->wallet_type == 'wallet'){
-                $withdrawal->user()->update([
-                    'wallet_balance' => $withdrawal->user->wallet_balance + $withdrawal->amount + $withdrawal->commission,
-                ]);
+            if($user){
+                if($withdrawal->wallet_type == 'wallet'){
+                    $withdrawal->user()->update([
+                        'wallet_balance' => $withdrawal->user->wallet_balance + $withdrawal->amount + $withdrawal->commission,
+                    ]);
+                }
+    
+                if($withdrawal->wallet_type == 'referral'){
+                    $withdrawal->user()->update([
+                        'referral_wallet_balance' => $withdrawal->user->referral_wallet_balance + $withdrawal->amount + $withdrawal->commission,
+                    ]);
+                }
+                
+                if($withdrawal->wallet_type == 'medal'){
+                    $withdrawal->user()->update([
+                        'medals_wallet_balance' => $withdrawal->user->medals_wallet_balance + $withdrawal->amount + $withdrawal->commission,
+                    ]);
+                }  
             }
-
-            if($withdrawal->wallet_type == 'referral'){
-                $withdrawal->user()->update([
-                    'referral_wallet_balance' => $withdrawal->user->referral_wallet_balance + $withdrawal->amount + $withdrawal->commission,
-                ]);
-            }
-            
-            if($withdrawal->wallet_type == 'medal'){
-                $withdrawal->user()->update([
-                    'medals_wallet_balance' => $withdrawal->user->medals_wallet_balance + $withdrawal->amount + $withdrawal->commission,
-                ]);
-            }
-            
+                                
             $withdrawal->delete();
-
             return back()->with('message', 'Delete Successful, Investor wallet has been updated');
-
-        }
+        }        
 
         if(auth()->user()->user_types == 1){
 

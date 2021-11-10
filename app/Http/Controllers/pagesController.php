@@ -48,20 +48,91 @@ class pagesController extends Controller
             $pending_requests = Withdrawal::wherePaid(0)->count();
             $plans = publishing_plans::count(); 
             $medals = Medal::count();
-            // dd($subscribers);
+           
             return view('backend.admin.index', compact('medals','subscribers', 'tasks', 'subscribers' ,'withdraw_request', 'pending_requests', 'plans', 'title' ));
         }
 
         if(auth()->user()->user_types == 1){
-            $title = 'User Dashboard';
-            if(auth()->user()->plans->count() < 1){
-                return view('backend.user.selectplans', compact('title'));
-            }
-           
-            return view('backend.user.index')->with(['title' => $title]);
+            return view('backend.user.index');
         }
         
     }
+
+    public function renew(){
+
+        if (!is_null(auth()->user()->plans) && auth()->user()->user_types == 1 && Carbon::parse(auth()->user()->plan_expiry) >= Carbon::now() ) {
+            return redirect(route('dashboard'));
+        }
+
+        if (is_null(auth()->user()->plans) ) {
+            return redirect(route('dashboard'));
+        }
+
+        $status = $this->getStatus(2); //1 - new plan, 2 - renew plan 3 - adverts, 4 - designs
+       
+        if(!is_null($status)){
+            //Check transaction status
+            $transactionDetails = collect($this->getTransactionDetails($status->reference));
+          
+            //There is payment but it is not confirmed
+            if(!empty($transactionDetails['payments'])){
+                $id = $transactionDetails['id'];
+                return redirect(route('confirm.payment', $id));
+            }
+        }
+       
+        $plan = auth()->user()->plans;
+        return view('backend.user.renewplans', compact('plan'));
+    }
+
+    public function select(){
+
+        $plans = publishing_plans::where('id', '!=', auth()->user()->publishing_plans_id)->get();
+    
+        if (!is_null(auth()->user()->plans) && auth()->user()->user_types == 1 && Carbon::parse(auth()->user()->plan_expiry) >= Carbon::now() ) {
+            return redirect(route('dashboard'));
+        }
+
+        $status = $this->getStatus(1); //1 - new plan, 2 - renew plan 3 - adverts, 4 - designs
+       
+        if(!is_null($status)){
+            //Check transaction status
+            $transactionDetails = collect($this->getTransactionDetails($status->reference));
+            //There is payment but it is not confirmed
+            if(!empty($transactionDetails['payments'])){
+                $id = $transactionDetails['id'];
+                return redirect(route('confirm.payment', $id));
+            }
+        }
+        
+        return view('backend.user.selectplans', compact('plans'));
+    }
+
+    public function selectnew(){
+        
+        $plans = publishing_plans::where('id', '!=', auth()->user()->publishing_plans_id)->get();
+    
+        if (!is_null(auth()->user()->plans) && auth()->user()->user_types == 1 && Carbon::parse(auth()->user()->plan_expiry) >= Carbon::now() ) {
+            return redirect(route('dashboard'));
+        }
+
+        $status = $this->getStatus(2); //1 - new plan, 2 - renew plan 3 - adverts, 4 - designs
+       
+        if(!is_null($status)){
+            //Check transaction status
+            $transactionDetails = collect($this->getTransactionDetails($status->reference));
+            //There is payment but it is not confirmed
+            if(!empty($transactionDetails['payments'])){
+                $id = $transactionDetails['id'];
+                return redirect(route('confirm.payment', $id));
+            }
+        }
+
+        $plans = publishing_plans::where('id', '!=', auth()->user()->publishing_plans_id)->get();
+        return view('backend.user.selectnewplan', compact('plans'));
+
+    }
+    
 
     public function test(Request $request){
        
@@ -95,10 +166,10 @@ class pagesController extends Controller
             
             $transaction = auth()->user()->transactions()->where('status', 'PENDING')->where('type', $request->type)->first();
             //if type == 1, i.e. Plan... we dont want multiple payments for a single plan
-            if($request->type && $request->type == 1){
+            if($request->type && ($request->type == 1 || $request->type == 2)){
                 $plan = publishing_plans::whereId($request->plan_id)->first();
                 $charge = $this->createCharge($plan->title, $plan->amount, auth()->user()->id, $request->type, $request->plan_id, 1);
-
+               
                 if(is_null($transaction)){
                     // Create new/
                     $transaction = $this->createTransactionLog(auth()->user()->id, $charge['data']['id'], $plan->amount, 'PENDING', $request->type, json_encode($charge['data']));
@@ -107,6 +178,8 @@ class pagesController extends Controller
                     $transaction->reference = $charge['data']['id'];
                     $transaction->save();
                 }
+            }else{
+
             }
 
             return redirect()->away($charge['data']['hosted_url']);
@@ -115,12 +188,14 @@ class pagesController extends Controller
 
     public function confirmPayment($id){
          //Check payment status and deliver value accordingly
-        $transactionDetails = $this->getTransactionDetails($id)['data'];
-        
+        $transactionDetails = $this->getTransactionDetails($id);
+
         if(is_null($transactionDetails)){
             return abort(404);
         }
+
         $status = $transactionDetails['payments'][0]['status'];
+          
         //Backward compatibility to payments
         if(!isset($transactionDetails['metadata']['user_id'])){
             $transactionDetails['metadata']['user_id'] = auth()->user()->id;
@@ -130,36 +205,19 @@ class pagesController extends Controller
         }
 
         if(!isset($transactionDetails['metadata']['type'])){
-            $transactionDetails['metadata']['type'] = 1;
-        }
-
-        //if type is plan         
-        if($transactionDetails['metadata']['type'] == 1){
-            $plan = publishing_plans::whereId($transactionDetails['metadata']['plan_id'])->first();
-            if($transactionDetails['payments'][0]['status'] == 'CONFIRMED'){
-
-                $this->processTransaction($plan ?? null, $transactionDetails, $transactionDetails['metadata']['type']);
-                $type = $transactionDetails['metadata']['type'];
-
-                return view('backend.user.paymentConfirmation', compact('status', 'type'));
-            }else{
-                return view('backend.user.paymentConfirmation', compact('status'));
-            }
+            $transactionDetails['metadata']['type'] = 2;
         }
         
-        //if type is designs
-        if($transactionDetails['metadata']['type'] == 2){
-            if($transactionDetails['payments'][0]['status'] == 'CONFIRMED'){
-
-                $this->processTransaction($plan ?? null, $transactionDetails, $transactionDetails['metadata']['type']);
-                $type = $transactionDetails['metadata']['type'];
-                return view('backend.user.paymentConfirmation', compact('status', 'type'));
-            }else{
-                // return view('backend.user.paymentConfirmation', compact('status'));
-            }
-        }
-
-        
+        //if type is new plan         
+        $plan = publishing_plans::whereId($transactionDetails['metadata']['plan_id'])->first();
+        $type = $transactionDetails['metadata']['type'];
+        if($transactionDetails['payments'][0]['status'] == 'CONFIRMED'){
+            $this->processTransaction($plan ?? null, $transactionDetails, $transactionDetails['metadata']['type']);
+            
+            return view('backend.user.paymentConfirmation', compact('status', 'type'));
+        }else{
+            return view('backend.user.paymentConfirmation', compact('status', 'type'));
+        }        
         
     }
     public function promote(){
@@ -175,12 +233,6 @@ class pagesController extends Controller
         
         $done_tasks = auth()->user()->tasks;
 
-        //Check if user has performed any task today
-        $task_history = auth()->user()->completedTasks();
-        if($task_history > 0){
-            return back()->with('error', 'You cannot attempt more than one promotion per day!');
-        }
-    
         foreach($done_tasks as $task){
            
             array_push($user_done_tasks, $task->id);
@@ -208,11 +260,14 @@ class pagesController extends Controller
             'created_at' =>  date("Y-m-d H:i:s"),
             'updated_at' =>  date("Y-m-d H:i:s"),
         ] );
-      
-        
-        UpdateUserWallet::dispatch(Auth::user()->id)
-                    ->delay(now()->addMinutes(1));
-
+     
+        //Check if user has performed any task today
+        $task_history = auth()->user()->completedTasks();
+        if($task_history <= 0){
+            // return back()->with('error', 'You cannot attempt more than one promotion per day!');
+            UpdateUserWallet::dispatch(Auth::user()->id)
+                ->delay(now()->addMinutes(Setting::first()->value('payment_delay')));
+        }
 
         if($media && $media == 1){ //Share to facebook
             $url = 'https://www.facebook.com/sharer/sharer.php?u='.$task->posturl.'&display=popup&target=_blank';
@@ -231,6 +286,9 @@ class pagesController extends Controller
 
     }
 
-   
+   private function getStatus($type){
+    $userTransaction = auth()->user()->transactions->where('type', $type)->where('status', 'PENDING')->first();
+    return $userTransaction;
+   }
 
 }

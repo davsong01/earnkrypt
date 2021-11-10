@@ -31,7 +31,7 @@ class DesignController extends Controller
         }
 
         if(auth()->user()->user_types == 1 ){
-            $allPayments = collect(auth()->user()->transactions->where('type', 2)->where('status', 'PENDING'));
+            $allPayments = collect(auth()->user()->transactions->where('type', 4)->where('status', 'PENDING'));
            
             if($allPayments){
                 
@@ -39,15 +39,14 @@ class DesignController extends Controller
                 foreach($allPayments as $payment){
                     // print_r($payment);
                    
-                        $transactionDetails = collect($this->getTransactionDetails($payment->reference)['data']);
-              
+                        $transactionDetails = collect($this->getTransactionDetails($payment->reference));
+                    
                         if(isset($transactionDetails['payments'][0]) && $transactionDetails['payments'][0]['status'] == 'CONFIRMED'){
-                          
                             $name = $transactionDetails['metadata']['variation'] ?? $payment->variation .  ' design';
                             $variation = $transactionDetails['metadata']['variation'] ?? $payment->variation;
                             
                             $percentage_bonus = !is_null(Setting::first()->value('design_referral_percent')) ? ((double) Setting::first()->value('design_referral_percent')/100) * $transactionDetails['payments'][0]['value']['local']['amount'] : 0;
-
+                           
                             $this->processDesignPayments($name, $payment->amount, $transactionDetails['payments'][0]['value']['local']['amount'], $variation, $payment->reference, $percentage_bonus, $transactionDetails);
                                                        
                         }
@@ -77,8 +76,8 @@ class DesignController extends Controller
             auth()->user()->update([
                 'wallet_balance' => $balance,
             ]);
-
-            $this->createSlot($type, $amount_paid, $payment_id, 'Coinbase', $payment);
+           
+            $this->createSlot($amount_paid, $payment_id, 'Coinbase', $payment, $purpose);
             $this->updateUplineOnAdvertDesignPayment($amount_paid, $percentage_bonus);
             $this->sendAdvertDesignEmail($payment_id, 'over_payment_received_for_advert', $amount_paid, $purpose, $balance);
         }
@@ -155,7 +154,6 @@ class DesignController extends Controller
              $transactionsToDelete = auth()->user()->transactions()->where('status', 'PENDING')->where('created_at', '<', Carbon::now()->subDay(7))->get();
              Transaction::destroy($transactionsToDelete->pluck('id'));
 
-            // dd($request->all());
             $amount = Setting::first()->value($request->variation.'_price');
 
             $charge = $this->createCharge($request->variation, $amount, auth()->user()->id, $request->type, null, 1, $request->variation);

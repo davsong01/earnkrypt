@@ -150,7 +150,7 @@
         @yield('content')
         </div>
         <footer class="footer text-center">
-             All Rights Reserved. &copy;{{ date('Y') }}. Designed and Developed by <a href="https://techdaves.com">TechDaves</a>.
+             All Rights Reserved. &copy;{{ date('Y') }}.<a href="{{ config('app.url') }}">{{ config('app.name') }}</a>.
         </footer>
     </div>
     

@@ -19,7 +19,7 @@ class UserController extends Controller
     public function index()
     {
         $count = 1;
-        $users = User::whereUserTypes(1)->with('plans', 'upline', 'tasks')->orderby('created_at', 'DESC')->get();
+        $users = User::whereUserTypes(1)->with('plans', 'upline', 'tasks')->orderby('publishing_plans_id', 'DESC')->get();
         
         return view('backend.admin.users.index', compact('count', 'users'));
     }
@@ -254,9 +254,14 @@ class UserController extends Controller
     }
     
     public function getReferral(){
-
         $count = 1;
-        $referralss = User::with('plans')->whereMyUpline(auth()->user()->id)->whereUserTypes(1)->where('id', '<>', auth()->user()->id)->get();
+        $referralss = User::with('plans')->whereMyUpline(auth()->user()->id)
+            ->whereUserTypes(1)
+            ->where('id', '<>', auth()->user()->id)
+            
+            ->orderBy('publishing_plans_id', 'DESC')
+            ->orderBy('created_at', 'DESC')
+            ->get();
         
         return view('backend.user.referrals', compact('referralss', 'count'));
 

@@ -14,10 +14,12 @@
                         <div>
                           
                            
-                            <h5 class="card-title"><a href="{{ route('withdraw.create') }}"><button
-                                type="button" class="btn btn-outline-primary create">Request for withdrawal</button></a></h5>
-       
-                            
+                                <p><strong>Heads Up: <br></strong> - You can only request for withdrawals from you referal wallet on Fridays and Saturdays <br>
+                                - You can only withdraw from your main wallet at the end of you promoting plan</p>
+                                {{-- {{  \Carbon\Carbon::now()->dayOfWeek() }} --}}
+                                <a href="{{ route('withdraw.create') }}">
+                                    <button type="button" class="btn btn-outline-primary create">Request for withdrawal</button></a>
+                                
                         </div>
                     </div>
 

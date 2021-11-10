@@ -25,18 +25,18 @@ class CreateSettingsTable extends Migration
 
             $table->string('advert_email')->nullable()->default('davedeloper@gmail.com');
             $table->string('advert_price')->nullable()->default(10);
-            $table->string('advert_payment_link')->nullable();
+            // $table->string('advert_payment_link')->nullable();
 
             $table->string('design_email')->nullable()->default('davedeloper@gmail.com');
             $table->string('logo_price')->nullable();
-            $table->string('logo_payment_link')->nullable();
+            // $table->string('logo_payment_link')->nullable();
             $table->string('flier_price')->nullable();
-            $table->string('flier_payment_link')->nullable();
+            $table->double('withdrawal_threshold')->nullable()->default(0);
             $table->string('graphics_video_price')->nullable();
-            $table->string('graphics_video_payment_link')->nullable();
+            // $table->string('graphics_video_payment_link')->nullable();
             
             $table->double('advert_referral_percent');
-            $table->idouble('design_referral_percent');
+            $table->double('design_referral_percent');
             $table->string('logo')->nullable();
             $table->string('favicon')->nullable();
 

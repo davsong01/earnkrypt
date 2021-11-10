@@ -20,7 +20,7 @@ class CreateTransactionsTable extends Migration
             $table->double('amount');
             $table->string('status');
             $table->string('plan_id')->nullable();
-            $table->string('type')->nullable();
+            $table->string('type')->nullable(); //1 - new plan, 2 - renew plan 3 - adverts, 4 - designs
             $table->string('variation')->nullable();
             $table->text('payment_data');
 

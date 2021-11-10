@@ -39,7 +39,7 @@ class AdvertController extends Controller
                 foreach($allPayments as $payment){
                     // print_r($payment);
                    
-                        $transactionDetails = collect($this->getTransactionDetails($payment->reference)['data']);
+                        $transactionDetails = collect($this->getTransactionDetails($payment->reference));
               
                         if(isset($transactionDetails['payments'][0]) && $transactionDetails['payments'][0]['status'] == 'CONFIRMED'){
                           

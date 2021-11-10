@@ -36,7 +36,7 @@
                                         {{-- <td>{{ $count ++ }}</td> --}}
                                         <td><img class="mr-1" style="border-radius:50%" src="{{ asset($user->avatar ? 'uploads/'.$user->avatar : 'uploads/avatars/default.jpg') }}" alt="avatar" height="40" width="40"></td>
                                         </td>
-                                        <td>{{ $user->name }}<br><span><a href="{{ config('app.url').'/register?ref='.$user->username }}">{{ config('app.url').'/register?ref='.$user->username }}</a> </span> <br>
+                                        <td>{{ $user->name }}<br><span><a href="{{ config('app.url').'register?ref='.$user->username }}">{{ config('app.url').'register?ref='.$user->username }}</a> </span> <br>
                                         {{ $user->email }}
                                         </td>
                                         

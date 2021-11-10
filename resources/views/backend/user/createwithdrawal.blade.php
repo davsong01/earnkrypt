@@ -21,6 +21,10 @@
                             <p>Please note that we transaction fees will be deducted from this amount <br>
                             <ol>
                                 <li>Ensure that you have filled in your wallet addresses</li>
+                                <li>You can only request for withdrawals from you referal wallet on Fridays and Saturdays
+                                </li>
+                                <li>You can only withdraw from your main wallet at the end of you promoting plan</li>
+                                <li>Your cumulative referral wallet and referral wallet must be up to or more than <strong>${{ \App\Models\Setting::first()->value('withdrawal_threshold') }}</strong> before you can withdraw from those wallets</li>
                                 <li>You can only withdraw once a month from your main wallet</li>
                                 <li>The coin equivalent of amount requested will be paid</li>
                                 <li>Commision of {{ auth()->user()->plans->commission }}% applies to this transaction if you are withdrawing from main wallet</li>
@@ -37,12 +41,20 @@
                                 <fieldset class="form-group">
                                     <label for="wallet">Select Wallet to withdraw from</label>
                                     <select class="form-control" name="wallet" id="wallet" required>
-                                        <option selected value="">Select Option</option>
-                                        @if(auth()->user()->withdraw() < 1)
+                                        <option selected value="">Select Option </option>
+                                        {{-- Can only withdraw from main wallet at the end of the plan month --}}
+                                        
+                                        @if(now() >= auth()->user()->plan_expiry)
                                         <option value="wallet">Main Wallet</option>
                                         @endif
+                                        @if(\Carbon\Carbon::now()->format("l") == 'Friday' || \Carbon\Carbon::now()->format("l") == 'Saturday' ))
+                                        @if(auth::user()->referral_wallet_balance >= \App\Models\Setting::first()->value('withdrawal_threshold'))
                                         <option value="referral">Refferal Earning</option>
+                                        @endif
+                                        @endif
+                                        @if(auth::user()->medals_wallet_balance >= \App\Models\Setting::first()->value('withdrawal_threshold'))
                                         <option value="medal">Medals Wallet</option>
+                                        @endif
                                     </select>
                                 </fieldset>
 

@@ -40,23 +40,6 @@ class TasksController extends Controller
             'status' => 'required',
             'posturl' => 'required|url'
         ]);
-
-       
-        // if($request->has('image')){
-        //     $filename = date('d-M-Y-s') . '-'. pathinfo($request->image->getClientOriginalName(), PATHINFO_FILENAME);
-            
-        //     $extension = $request->image->getClientOriginalExtension();                 
-        //     $imagePath = $request->image->storeAs('images', $filename.'.'.$extension,'uploads'); 
-            
-        // }else $imagePath = NULL;
-
-        // if($request->has('video')){
-        //     $filename = date('d-M-Y-s') . '-'. pathinfo($request->video->getClientOriginalName(), PATHINFO_FILENAME);
-            
-        //     $extension = $request->video->getClientOriginalExtension();                 
-        //     $videoPath = $request->video->storeAs('videos', $filename.'.'.$extension,'uploads'); 
-            
-        // }else $videoPath = NULL;
             
         Task::create([
             'title' => $data['title'],

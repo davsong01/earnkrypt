@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use Carbon\Carbon;
+use App\Models\User;
 use App\Models\Advert;
 use App\Models\Design;
 use App\Models\Setting;
@@ -44,20 +45,18 @@ class Controller extends BaseController
                 }
             }
             
-
             return redirect()->away($charge['data']['hosted_url']);
           
     }
 
-    protected function createSlot($amount, $payment_id = null, $payment_type = null, $payment = null ){
-        
+    protected function createSlot($amount, $payment_id, $payment_type, $payment, $purpose){
         $design = Design::create([
             'user_id' => auth()->user()->id,
             'amount_paid' => $amount,
             'transaction_id' => $payment_id,
-            'variation' => $payment_type,
+            'variation' => $purpose,
         ]);
-    
+ 
         if(!empty($payment)){
             $transaction = Transaction::whereReference($payment_id)->first();
             
@@ -77,7 +76,6 @@ class Controller extends BaseController
             return 1;
         }
     }
-
 
     protected function createAdvertSlot($amount, $trans_id = null, $payment_type = null, $payment = null){
         $advert = Advert::create([
@@ -164,7 +162,6 @@ class Controller extends BaseController
                 $plan_expiry = Carbon::now()->addDays($plan->validity + $difference) ;
             }else{
                 $plan_expiry  = Carbon::now()->addDays($plan->validity);
-                
             }
         }else{
             $plan_expiry = Carbon::now()->addDays($plan->validity);
@@ -206,7 +203,7 @@ class Controller extends BaseController
             ],
             'metadata' => [
                 'user_id' => $user_id,
-                'type' => $type , //1 - plans, 2 - adverts, 3 - designs
+                'type' => $type, //1 - new plan, 2 - renew plan 3 - adverts, 4 - designs
                 'plan_id' => $plan_id ?? auth()->user()->plans->id,
                 'quantity' => $quantity,
                 'variation' => $variation ?? null, //Used by designs
@@ -217,74 +214,53 @@ class Controller extends BaseController
         return $charge;
     }
    
-    // protected function getCharges($url){
-    //     $curl = curl_init();
-
-    //     curl_setopt_array($curl, array(
-    //         CURLOPT_URL => 'https://api.commerce.coinbase.com/charges',
-    //         CURLOPT_RETURNTRANSFER => true,
-    //         CURLOPT_ENCODING => '',
-    //         CURLOPT_MAXREDIRS => 100,
-    //         CURLOPT_TIMEOUT => 0,
-    //         CURLOPT_FOLLOWLOCATION => true,
-    //         CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-    //         CURLOPT_CUSTOMREQUEST => 'GET',
-    //         CURLOPT_HTTPHEADER => array(
-    //             'X-CC-Api-Key: 289d349d-831d-4d2a-99fa-012db1dadb03',
-    //             'Cookie: __cfduid=db701e704100840bad156cdfdc957b7ae1616524238; amplitude_device_id=f1103d1d-59eb-4137-b39a-336c6ca6005f; coinbase_device_id=f1103d1d-59eb-4137-b39a-336c6ca6005f'
-    //         ),
-           
-    //     ));
-
-    //     $response = curl_exec($curl);
-
-    //     curl_close($curl);
-
-    //     return $response;
-    // }
-
     protected function getTransactionDetails($id){
-        return Coinbase::getCharge($id);
+        $response = Coinbase::getCharge($id);
+      
+        return $response['data'];
+
     }
 
     protected function processTransaction($plan, $payment, $type){ //1 - plans, 2 - adverts, 3 - designs
-        if($type == 1){
-            // add plan value
+        if($type == 1 || $type == 2){ 
+            // add new plan value
             if($payment['payments'][0]['value']['local']['amount'] > $plan->amount ) {
                 auth()->user()->wallet_balance = auth()->user()->wallet_balance + ($payment['payments'][0]['value']['local']['amount'] - $plan->amount);
             }elseif($payment['payments'][0]['value']['local']['amount'] == $plan->amount){
+                //Assign plan and month
                 auth()->user()->publishing_plans_id = $plan->id;
                 auth()->user()->plan_expiry = Carbon::parse($payment['confirmed_at'])->addMonth(1);
                 auth()->user()->save();
     
             }else{
                 //Silence is golden
+                // return;
             }
-    
-            //Update rreferal plan
-            $this->updateReferral($plan); 
-           
+            if($type == 1){
+                //Update referral medal
+                $this->awardMedal(auth()->user()->my_upline);
+
+                //Update referal plan
+                $this->updateReferral($plan); 
+            }
+            
             Mail::to(auth()->user()->email)->send(new paymentComplete(auth()->user(), $payment['name'], $payment['payments'][0]['value']['local']['amount']));
     
             Mail::to(Setting::select('official_mail')->first()->value('official_mail'))->send(new paymentComplete(auth()->user(), $payment['name'], $payment['payments'][0]['value']['local']['amount']));
         }
 
-        if($type == 2){
-            // add advert value
+        if($type == 2){ //Renew plan
+
+            Mail::to(auth()->user()->email)->send(new paymentComplete(auth()->user(), $payment['name'], $payment['payments'][0]['value']['local']['amount']));
         }
 
-        if($type == 3){
-            // add design value
-        }
-
-        // create transaction log
-        $this->UpdateTransactionLog($payment['id'], $payment['payments'][0]['status'], json_encode($payment)); 
-                    
+        // update transaction
+        $this->UpdateTransactionLog($payment['id'], $payment['payments'][0]['status'], json_encode($payment));          
     }
 
     protected function updateTransactionLog($ref, $status, $data){
         $transaction = Transaction::where('reference', $ref)->first();
-    
+        
         $transaction->update([
             'reference' => $ref,
             'status' => $status,
@@ -293,36 +269,75 @@ class Controller extends BaseController
 
         return;
     }
-    // protected function getCharges(){
-    //     $curl = curl_init();
 
-    //     curl_setopt_array($curl, array(
-    //         CURLOPT_URL => 'https://api.commerce.coinbase.com/charges',
-    //         CURLOPT_RETURNTRANSFER => true,
-    //         CURLOPT_ENCODING => '',
-    //         CURLOPT_MAXREDIRS => 100,
-    //         CURLOPT_TIMEOUT => 0,
-    //         CURLOPT_FOLLOWLOCATION => true,
-    //         CURLOPT_HTTP_VERSION => CURL_HTTP_VERSION_1_1,
-    //         CURLOPT_CUSTOMREQUEST => 'GET',
-    //         CURLOPT_HTTPHEADER => array(
-    //             'X-CC-Api-Key: 289d349d-831d-4d2a-99fa-012db1dadb03',
-    //             'Cookie: __cfduid=db701e704100840bad156cdfdc957b7ae1616524238; amplitude_device_id=f1103d1d-59eb-4137-b39a-336c6ca6005f; coinbase_device_id=f1103d1d-59eb-4137-b39a-336c6ca6005f'
-    //         ),
-           
-    //     ));
+    protected function awardMedal($upline){
+        $referrals = User::whereMyUpline($upline)->whereUserTypes(1)->get();
+        $count = $referrals->count();
+        
+        //Prepare for slow and steady medal
+        $timestamp = time()-86400;
+        $date = strtotime("-6 day", $timestamp);
+        $today = date('Y-m-d H:i:s');
+        $aweek_ago = date('Y-m-d 00:00:00', $date);
 
-    //     $response = curl_exec($curl);
+        $slow_and_steady_counter = $referrals->where('created_at', '<=', $today )->where('created_at', '>=', $aweek_ago );
 
-    //     curl_close($curl);
-       
-    //     $data = json_decode($response, true);
-    //     $push = $data['data'];
-    //     dd($push);
-    //     while(!is_null($data['pagination']['nex_uri'])){
+        // SLOW AND STEADY
+        // REFER 15 FRIENDS WITHIN 1 WEEK-$15
+        if($slow_and_steady_counter->count() == 15){
+             $upline->medals()->attach(2, [
+                'created_at' =>  date("Y-m-d H:i:s"),
+            ]);
 
-    //     }
-    //     return $response;
-    // }
+            $upline->medals_wallet_balance = $upline->medals_wallet_balance + Medal::whereId(2)->value('value');
 
+            $upline->save();
+         
+        }
+
+        //Earn Ambasador Medal
+        if($count == 5){
+            $upline->medals()->attach(1, [
+                'created_at' =>  date("Y-m-d H:i:s"),
+            ]);
+
+            $upline->medals_wallet_balance = $upline->medals_wallet_balance + Medal::whereId(1)->value('value');
+
+            $upline->save();
+        }
+
+        //Earn I am a Titan Medal
+        if($count == 30){
+            $upline->medals()->attach(3, [
+                'created_at' =>  date("Y-m-d H:i:s"),
+            ]);
+
+            $upline->medals_wallet_balance = $upline->medals_wallet_balance + Medal::whereId(3)->value('value');
+
+            $upline->save();
+        }
+
+        //Earn PASS ME THE GOLD
+        if($count == 60){
+            $upline->medals()->attach(4, [
+                'created_at' =>  date("Y-m-d H:i:s"),
+            ]);
+
+            $upline->medals_wallet_balance = $upline->medals_wallet_balance + Medal::whereId(4)->value('value');
+
+            $upline->save();
+        }
+
+        //Earn I AM LEGENDARY 
+        if($count == 120){
+            $upline->medals()->attach(5, [
+                'created_at' =>  date("Y-m-d H:i:s"),
+            ]);
+
+            $upline->medals_wallet_balance = $upline->medals_wallet_balance + Medal::whereId(5)->value('value');
+
+            $upline->save();
+        }  
+
+    }
 }

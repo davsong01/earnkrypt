@@ -12,7 +12,7 @@
                 <div class="colored-line">
                 </div>
                 <div class="section-description">
-                Getting to grow your social media engagements can be very annoying, We know, That's why we built Earnkrypt. With Earnkrypt you cna easily buy real time social media engagements in no time.
+                Getting to grow your social media engagements can be very annoying, We know, That's why we built Earnkrypt. With Earnkrypt you can easily buy real time social media engagements in no time.
                 </div>
                 <div class="colored-line">
                 </div>
@@ -38,7 +38,7 @@
                         <!-- FEATURE HEADING AND DESCRIPTION -->
                         <div class="fetaure-details">
                             <h4 class="main-color">Human Views</h4>
-                            <p>Earnkrypt global provide an avenue for publishers to pay to promote their Business. so you're absolutely certain to be paid once you're done. Revenues readily available for dispensal. </p>
+                            <p>Earnkrypt provide an avenue for publishers to pay to promote their Business. so you're absolutely certain to be paid once you're done. Revenues readily available for dispensal. </p>
                         </div>
 
                     </div>
@@ -193,7 +193,7 @@
                 </div>
 
                 <div class="section-description">
-                    List your app features and all the details Lorem ipsum dolor kadr
+                   <a target="_blank" href="{{ route('register') }}">Subscribe</a> to one of our packages and start earning
                 </div>
 
                 <div class="colored-line">
@@ -205,18 +205,13 @@
                 @foreach($plans as $plan)
                 <div class="col-md-4 col-sm-4 single-service wow fadeIn animated" data-wow-offset="10"
                     data-wow-duration="1.5s">
-
                     <div class="single-package">
-
                         <h3 class="package-heading main-color">{{ $plan->title }} </h3>
-
                         <div class="price">
                             <h3><span class="sign">$</span>{{ $plan->amount }} <span class="month">/{{ $plan->validity }} days</span></h3>
                         </div>
-
                         <ul class="package-feature">
                             {!! $plan->description !!}
-                            
                         </ul>
 
                     </div>

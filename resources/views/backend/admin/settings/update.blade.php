@@ -62,13 +62,13 @@
                             value="{{ old('advert_price') ?? $setting->advert_price }}">
                     </div>
                  </div>
-                <div class="col-md-6 col-sm-12 col-xs-12">
+                {{-- <div class="col-md-6 col-sm-12 col-xs-12">
                     <div class="form-group-inner">
                         <label>Advert Payment Link</label>
                         <input type="url" class="form-control" name="advert_payment_link" required
                             value="{{ old('advert_payment_link') ?? $setting->advert_payment_link }}">
                     </div>
-                </div>
+                </div> --}}
                 <div class="col-md-6 col-sm-12 col-xs-12">
                     <div class="basic-login-inner">
                             <label>Design Ordering Email Address</label>
@@ -85,9 +85,9 @@
                 </div>
                 <div class="col-md-6 col-sm-12 col-xs-12">
                     <div class="form-group-inner">
-                        <label>Logo design coinbase payment link</label>
-                        <input type="url" class="form-control" name="logo_payment_link" required
-                            value="{{ old('logo_payment_link') ?? $setting->logo_payment_link }}">
+                        <label>Minimum amount for withdrawal</label>
+                        <input type="number" class="form-control" name="withdrawal_threshold" required
+                            value="{{ old('withdrawal_threshold') ?? $setting->withdrawal_threshold }}" step=".01">
                     </div>
                 </DIV>
                 <div class="col-md-6 col-sm-12 col-xs-12">
@@ -97,13 +97,13 @@
                             value="{{ old('flier_price') ?? $setting->flier_price }}">
                     </div>
                 </DIV>
-                <div class="col-md-6 col-sm-12 col-xs-12">
+                {{-- <div class="col-md-6 col-sm-12 col-xs-12">
                     <div class="form-group-inner">
                         <label>Flier design coinbase payment link</label>
                         <input type="url" class="form-control" name="flier_payment_link" required
                             value="{{ old('flier_payment_link') ?? $setting->flier_payment_link }}">
                     </div>
-                </DIV>
+                </DIV> --}}
                     
                 <div class="col-md-6 col-sm-12 col-xs-12">
                     <div class="form-group-inner">
@@ -112,13 +112,13 @@
                             value="{{ old('graphics_video_price') ?? $setting->graphics_video_price }}">
                     </div>
                 </div>
-                <div class="col-md-6 col-sm-12 col-xs-12">
+                {{-- <div class="col-md-6 col-sm-12 col-xs-12">
                     <div class="form-group-inner">
                         <label>Graphics Video coinbase payment link</label>
                         <input type="url" class="form-control" name="graphics_video_payment_link" required
                             value="{{ old('graphics_video_payment_link') ?? $setting->graphics_video_payment_link }}">
                     </div>
-                </div>
+                </div> --}}
             </div>
             <div class="row">
                 <div class="col-md-6 col-sm-12 col-xs-12">
