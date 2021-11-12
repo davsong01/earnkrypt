@@ -42,7 +42,7 @@
                 </div>
                 <div class="col-md-6 col-sm-12 col-xs-12">
                     <div class="form-group-inner">
-                        <label>Payment delay(seconds)</label>
+                        <label>Payment delay(minutes)</label>
                         <input type="number" class="form-control" name="payment_delay" required
                             value="{{ old('payment_delay') ?? $setting->payment_delay }}">
                     </div>
@@ -57,18 +57,12 @@
                 </div>
                 <div class="col-md-6 col-sm-12 col-xs-12">
                     <div class="form-group-inner">
-                        <label>Advert price</label>
+                        <label>Advert price ($)</label>
                         <input type="text" class="form-control" name="advert_price" required
                             value="{{ old('advert_price') ?? $setting->advert_price }}">
                     </div>
                  </div>
-                {{-- <div class="col-md-6 col-sm-12 col-xs-12">
-                    <div class="form-group-inner">
-                        <label>Advert Payment Link</label>
-                        <input type="url" class="form-control" name="advert_payment_link" required
-                            value="{{ old('advert_payment_link') ?? $setting->advert_payment_link }}">
-                    </div>
-                </div> --}}
+               
                 <div class="col-md-6 col-sm-12 col-xs-12">
                     <div class="basic-login-inner">
                             <label>Design Ordering Email Address</label>
@@ -78,21 +72,21 @@
                 </div>
                 <div class="col-md-6 col-sm-12 col-xs-12">
                     <div class="form-group-inner">
-                        <label>Logo design price</label>
+                        <label>Logo design ($)</label>
                         <input type="text" class="form-control" name="logo_price" required
                             value="{{ old('logo_price') ?? $setting->logo_price }}">
                     </div>
                 </div>
                 <div class="col-md-6 col-sm-12 col-xs-12">
                     <div class="form-group-inner">
-                        <label>Minimum amount for withdrawal</label>
+                        <label>Minimum amount for withdrawal ($)</label>
                         <input type="number" class="form-control" name="withdrawal_threshold" required
                             value="{{ old('withdrawal_threshold') ?? $setting->withdrawal_threshold }}" step=".01">
                     </div>
                 </DIV>
                 <div class="col-md-6 col-sm-12 col-xs-12">
                     <div class="form-group-inner">
-                        <label>Flier design price</label>
+                        <label>Flier design price ($)</label>
                         <input type="text" class="form-control" name="flier_price" required
                             value="{{ old('flier_price') ?? $setting->flier_price }}">
                     </div>
@@ -107,7 +101,7 @@
                     
                 <div class="col-md-6 col-sm-12 col-xs-12">
                     <div class="form-group-inner">
-                        <label>Graphics Video price</label>
+                        <label>Graphics Video price ($)</label>
                         <input type="text" class="form-control" name="graphics_video_price" required
                             value="{{ old('graphics_video_price') ?? $setting->graphics_video_price }}">
                     </div>

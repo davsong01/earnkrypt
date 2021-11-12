@@ -8,7 +8,8 @@
             <div class="card">
                 <div class="card-body">
                     <h5 class="card-title">Hello {{ auth()->user()->name }}</h5>
-                    <p>Please select a medium to promote today's task on <br><br></p>
+                    <p>Please select a medium to promote today's task on <br>
+                        <strong style="color:red">Please use the buttons below wisely, you can only share once per day!</strong><br><br><br><br></p>
                     <div class="row">
                         <div class="col-sm-6 col-md-6 col-lg-6 col-xlg-6" style="max-width: 45%;">
                             <a href="{{ route( 'promote.new', 1 ) }}" target="_blank">

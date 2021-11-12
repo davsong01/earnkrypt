@@ -11,6 +11,8 @@
                     <li class="sidebar-item {{ Request::is('dashboard') ? 'active' : '' }}"> <a class="sidebar-link waves-effect waves-dark sidebar-link" href="/dashboard" aria-expanded="false"><i class="mdi mdi-view-dashboard"></i><span class="hide-menu">Dashboard</span></a></li>
                     <li class="sidebar-item {{ Request::is('tasks*') ? 'active' : '' }}"> <a class="sidebar-link waves-effect waves-dark sidebar-link" href="{{ route('tasks.index') }}" aria-expanded="false"><i class="fa fa-list"></i><span class="hide-menu">Tasks</span></a></li>
 
+                    <li class="sidebar-item {{ Request::is('tasks/completed') ? 'active' : '' }}"> <a class="sidebar-link waves-effect waves-dark sidebar-link" href="{{ route('tasks.completed') }}" aria-expanded="false"><i class="fa fa-check"></i><span class="hide-menu">Completed Tasks</span></a></li>
+
                     <li class="sidebar-item {{ Request::is('plans*') ? 'active' : '' }}"> <a class="sidebar-link waves-effect waves-dark sidebar-link" href="{{ route('plans.index') }}" aria-expanded="false"><i class="mdi mdi-chart-bar"></i><span class="hide-menu">Plans</span></a></li>
                     <li class="sidebar-item {{ Request::is('vendor*') ? 'active' : '' }}"> <a class="sidebar-link waves-effect waves-dark sidebar-link" href="{{ route('vendor.index') }}" aria-expanded="false"><i class="fa fa-industry"></i><span class="hide-menu">Vendor Management</span></a></li>
 
@@ -24,7 +26,9 @@
                     <li class="sidebar-item {{ Request::is('admins*') ? 'active' : '' }}"> <a class="sidebar-link waves-effect waves-dark sidebar-link" href="{{ route('admins.index') }}" aria-expanded="false"><i class="fa fa-users"></i><span class="hide-menu"> System Admins</span></a></li>
                     <li class="sidebar-item {{ Request::is('transaction*') ? 'active' : '' }}"> <a class="sidebar-link waves-effect waves-dark sidebar-link" href="{{ route('transaction.index') }}" aria-expanded="false"><i class="fa fa-bitcoin"></i><span class="hide-menu">Transactions</span></a></li>
                     <li class="sidebar-item {{ Request::is('setting*') ? 'active' : '' }}"> <a class="sidebar-link waves-effect waves-dark sidebar-link" href="{{ route('setting.index') }}" aria-expanded="false"><i class="mdi mdi-settings"></i><span class="hide-menu">Settings</span></a></li>
-                @endif
+                    <li class="sidebar-item {{ Request::is('notification*') ? 'active' : '' }}"> <a class="sidebar-link waves-effect waves-dark sidebar-link" href="{{ route('notification.index') }}" aria-expanded="false"><i class="fa fa-bullhorn"></i><span class="hide-menu">Notification</span></a></li>
+                
+                    @endif
                 @if(auth()->user()->user_types == 1)
                 <li class="sidebar-item {{ Request::is('promote*') ? 'active' : '' }}"> <a class="sidebar-link waves-effect waves-dark sidebar-link" href="{{ route('promote.index') }}" aria-expanded="false"><i class="fa fa-play"></i><span class="hide-menu">Promote</span></a></li>
                 <li class="sidebar-item {{ Request::is('withdraw*') ? 'active' : '' }}"> <a class="sidebar-link waves-effect waves-dark sidebar-link" href="{{ route('withdraw.index') }}" aria-expanded="false"><i class="mdi mdi-wallet-travel"></i><span class="hide-menu">Withdrawals</span></a></li>

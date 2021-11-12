@@ -26,7 +26,32 @@
 <!-- =========================
      SCRIPTS 
 ============================== -->
+{{-- Notice modal --}}
+@php
+    $notification = \App\Models\Notification::first();
+@endphp
+@if(isset($notification) && $notification->status == 1)
+        <script>
+	$(document).ready(function(){
+		$("#notice").modal('show');
+	});
+    </script>
+    <div id="notice" class="modal fade">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title"> <strong>{{ $notification->title }}</strong></h5>
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                </div>
+                <div class="modal-body">
+                    {!! $notification->content !!}
+                </div>
+            </div>
+        </div>
+    </div>
+@endif
 
+{{-- end notice modal --}}
 <script src="{{ asset('js/bootstrap.min.js') }}"></script>
 <script src="{{ asset('js/smoothscroll.js') }}"></script>
 <script src="{{ asset('js/jquery.scrollTo.min.js') }}"></script>

@@ -232,19 +232,17 @@ class pagesController extends Controller
         $user_done_tasks = [];
         
         $done_tasks = auth()->user()->tasks;
-
+        
         foreach($done_tasks as $task){
            
             array_push($user_done_tasks, $task->id);
         }
-        
+       
         $tasks = Task::where('status', 'Publish')->get();
 
         foreach($tasks as $key=> $task){
             if(in_array($task->id, $user_done_tasks)){
-                
                 $tasks->forget($key);
-
             }
         }
        
@@ -252,18 +250,20 @@ class pagesController extends Controller
         if(!$task){
             return back()->with('warning', 'You are doing well, no tasks to complete at the moment! Check back later');
         }
-        //Mark task as complete
-        
-        // dd($this->task);
-        auth()->user()->tasks()->attach($task->id, [
-            'initiated' => 1,
-            'created_at' =>  date("Y-m-d H:i:s"),
-            'updated_at' =>  date("Y-m-d H:i:s"),
-        ] );
-     
+  
         //Check if user has performed any task today
         $task_history = auth()->user()->completedTasks();
+        if($task_history > 0){
+            return back()->with('error', 'You can only share once per day, the system is verifiying status of the promotion you have shared today');
+        }
         if($task_history <= 0){
+            // dd($this->task);
+            auth()->user()->tasks()->attach($task->id, [
+                'initiated' => 1,
+                'created_at' =>  date("Y-m-d H:i:s"),
+                'updated_at' =>  date("Y-m-d H:i:s"),
+            ] );
+     
             // return back()->with('error', 'You cannot attempt more than one promotion per day!');
             UpdateUserWallet::dispatch(Auth::user()->id)
                 ->delay(now()->addMinutes(Setting::first()->value('payment_delay')));

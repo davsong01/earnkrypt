@@ -172,6 +172,9 @@ Route::middleware(['admin', 'auth'])->group(function(){
     Route::resource('setting', '\App\Http\Controllers\SettingController');
     Route::resource('admins', '\App\Http\Controllers\AdminController');
     Route::resource('transaction', '\App\Http\Controllers\TransactionController');
+    Route::get('completedtasks', '\App\Http\Controllers\TasksController@completed')->name('tasks.completed');
+    Route::get('notification', '\App\Http\Controllers\NotificationController@index')->name('notification.index');
+    Route::patch('notification/{id}', '\App\Http\Controllers\NotificationController@update')->name('notification.update');
 });
 
 Route::resource('advert', '\App\Http\Controllers\AdvertController');

@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Task;
+use App\Models\User;
 use App\Models\tasks;
+use App\Models\TaskUser;
 use Illuminate\Http\Request;
 
 class TasksController extends Controller
@@ -101,5 +103,20 @@ class TasksController extends Controller
     public function getfile($filename){
         $realpath = base_path() . '/uploads/media'. '/' .$filename;
         return response()->download($realpath);
+    }
+
+
+    public function completed(){
+        $completedTasks = TaskUser::orderBy('created_at', 'DESC')->get();
+
+        $completedTasks = $completedTasks->reject(function ($value) {
+            $value['user'] = User::select('name', 'email', 'publishing_plans_id')->where('id', $value['user_id'])->first();
+            $value['task'] = Task::select('title', 'posturl')->where('id', $value['task_id'])->first();
+            
+            return is_null($value['user']) || is_null($value['task']);
+        });
+
+        $count = 1;
+        return view('backend.admin.users.completedtasks', compact('completedTasks', 'count'));
     }
 }
